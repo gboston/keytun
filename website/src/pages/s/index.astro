@@ -1,0 +1,294 @@
+---
+// ABOUTME: Web-based join page for keytun sessions.
+// ABOUTME: Connects to the relay via WebSocket, performs E2E encrypted key exchange, and renders a terminal.
+import Layout from '../../layouts/Layout.astro';
+import Nav from '../../components/Nav.astro';
+---
+
+<Layout title="Join Session — keytun" description="Join a keytun session from your browser.">
+	<Nav />
+	<main>
+		<div class="join-container">
+			<div id="status-area" class="status-area">
+				<div class="status-icon" id="status-icon">
+					<div class="spinner"></div>
+				</div>
+				<div class="status-text" id="status-text">Initializing...</div>
+			</div>
+
+			<div class="terminal" id="terminal-wrapper" style="display: none;">
+				<div class="terminal-bar">
+					<div class="terminal-dots">
+						<span class="dot dot-red"></span>
+						<span class="dot dot-yellow"></span>
+						<span class="dot dot-green"></span>
+					</div>
+					<span class="terminal-title" id="terminal-title">keytun</span>
+				</div>
+				<div id="terminal-container" class="terminal-xterm"></div>
+			</div>
+
+			<div class="hint" id="hint" style="display: none;">
+				Press <kbd>Esc</kbd> twice to disconnect
+			</div>
+
+			<div id="error-area" class="error-area" style="display: none;">
+				<div class="error-icon">!</div>
+				<div class="error-text" id="error-text"></div>
+				<a href="/" class="btn btn-ghost error-btn">Back to keytun.com</a>
+			</div>
+		</div>
+	</main>
+
+	<script>
+		import { Terminal } from '@xterm/xterm';
+		import { FitAddon } from '@xterm/addon-fit';
+		import '@xterm/xterm/css/xterm.css';
+		import { KeytunClient, EscapeDetector } from '../../scripts/keytun-client.js';
+
+		const RELAY_URL = 'wss://relay.keytun.com/ws';
+
+		// Extract session code from URL path: /s/keen-fox-42 -> keen-fox-42
+		// Falls back to ?session= query param for local development
+		const params = new URLSearchParams(window.location.search);
+		const pathParts = window.location.pathname.split('/s/');
+		const sessionCode = pathParts[1]?.replace(/\/$/, '') || params.get('session') || '';
+
+		// Allow relay override via query param
+		const relayURL = params.get('relay') || RELAY_URL;
+
+		const statusArea = document.getElementById('status-area')!;
+		const statusIcon = document.getElementById('status-icon')!;
+		const statusText = document.getElementById('status-text')!;
+		const terminalWrapper = document.getElementById('terminal-wrapper')!;
+		const terminalContainer = document.getElementById('terminal-container')!;
+		const terminalTitle = document.getElementById('terminal-title')!;
+		const hint = document.getElementById('hint')!;
+		const errorArea = document.getElementById('error-area')!;
+		const errorText = document.getElementById('error-text')!;
+
+		function showStatus(text: string) {
+			statusArea.style.display = 'flex';
+			statusText.textContent = text;
+			errorArea.style.display = 'none';
+		}
+
+		function showError(text: string) {
+			statusArea.style.display = 'none';
+			terminalWrapper.style.display = 'none';
+			hint.style.display = 'none';
+			errorArea.style.display = 'flex';
+			errorText.textContent = text;
+		}
+
+		function showTerminal() {
+			statusArea.style.display = 'none';
+			terminalWrapper.style.display = 'block';
+			hint.style.display = 'block';
+		}
+
+		async function main() {
+			if (!sessionCode) {
+				showError('No session code in URL. Ask the host for a join link like keytun.com/s/keen-fox-42');
+				return;
+			}
+
+			// Check browser support for X25519
+			try {
+				const testKey = await crypto.subtle.generateKey('X25519' as any, false, ['deriveBits']);
+			} catch {
+				showError('Your browser does not support X25519 encryption. Please use Chrome 113+, Safari 17+, or Firefox 130+.');
+				return;
+			}
+
+			terminalTitle.textContent = `keytun — ${sessionCode}`;
+
+			// Set up xterm.js
+			const term = new Terminal({
+				cursorBlink: true,
+				fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace",
+				fontSize: 14,
+				theme: {
+					background: getComputedStyle(document.documentElement).getPropertyValue('--terminal-bg').trim() || '#141925',
+					foreground: '#c9d1d9',
+					cursor: '#c9d1d9',
+					selectionBackground: 'rgba(139, 108, 224, 0.3)',
+				},
+			});
+
+			const fitAddon = new FitAddon();
+			term.loadAddon(fitAddon);
+
+			// Connect to relay
+			showStatus(`Connecting to session ${sessionCode}...`);
+
+			const client = new KeytunClient(relayURL, sessionCode);
+			const escapeDetector = new EscapeDetector(300);
+
+			client.onError = (msg: string) => {
+				showError(msg);
+			};
+
+			client.onClose = () => {
+				term.write('\r\n\x1b[90m[disconnected]\x1b[0m\r\n');
+				hint.style.display = 'none';
+			};
+
+			try {
+				showStatus('Joining session...');
+				await client.connect();
+			} catch (err: any) {
+				showError(`Failed to connect: ${err.message}`);
+				return;
+			}
+
+			// Connection established — show terminal
+			showTerminal();
+			term.open(terminalContainer);
+			fitAddon.fit();
+			term.focus();
+
+			window.addEventListener('resize', () => fitAddon.fit());
+
+			// Wire output: relay -> terminal
+			client.onOutput = (data: Uint8Array) => {
+				term.write(data);
+			};
+
+			// Wire input: terminal -> relay (with escape detection)
+			term.onData((data: string) => {
+				const bytes = new TextEncoder().encode(data);
+
+				for (let i = 0; i < bytes.length; i++) {
+					const result = escapeDetector.feed(bytes[i]);
+
+					switch (result) {
+						case 'disconnect':
+							client.disconnect();
+							return;
+						case 'held':
+							// Don't send yet, wait for next byte
+							break;
+						case 'flush':
+							// Send the pending escape + current byte
+							client.sendInput(new Uint8Array([0x1b, bytes[i]]));
+							break;
+						case 'pass':
+							client.sendInput(new Uint8Array([bytes[i]]));
+							break;
+					}
+				}
+			});
+		}
+
+		main();
+	</script>
+</Layout>
+
+<style>
+	main {
+		min-height: 100vh;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 80px 24px 24px;
+	}
+
+	.join-container {
+		width: 100%;
+		max-width: 900px;
+	}
+
+	/* Status area */
+	.status-area {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 16px;
+		padding: 48px 24px;
+	}
+
+	.status-text {
+		font-family: var(--font-mono);
+		font-size: 0.95rem;
+		color: var(--text-dim);
+	}
+
+	.spinner {
+		width: 32px;
+		height: 32px;
+		border: 3px solid var(--border);
+		border-top-color: var(--accent-coral);
+		border-radius: 50%;
+		animation: spin 0.8s linear infinite;
+	}
+
+	@keyframes spin {
+		to { transform: rotate(360deg); }
+	}
+
+	/* Terminal */
+	.terminal-xterm {
+		padding: 8px 4px;
+		min-height: 300px;
+	}
+
+	/* Disconnect hint */
+	.hint {
+		text-align: center;
+		margin-top: 16px;
+		font-size: 0.85rem;
+		color: var(--text-muted);
+	}
+
+	.hint kbd {
+		display: inline-block;
+		padding: 2px 8px;
+		font-family: var(--font-mono);
+		font-size: 0.8rem;
+		background: var(--bg-elevated);
+		border-radius: 4px;
+		box-shadow: var(--keycap-shadow-sm);
+	}
+
+	/* Error area */
+	.error-area {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 16px;
+		padding: 48px 24px;
+		text-align: center;
+	}
+
+	.error-icon {
+		width: 48px;
+		height: 48px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 1.5rem;
+		font-weight: 700;
+		color: var(--accent-coral);
+		background: var(--badge-bg);
+		border: 1px solid var(--badge-border);
+		border-radius: 50%;
+	}
+
+	.error-text {
+		font-size: 1rem;
+		color: var(--text-dim);
+		max-width: 500px;
+	}
+
+	.error-btn {
+		margin-top: 8px;
+	}
+
+	/* Responsive */
+	@media (max-width: 768px) {
+		.terminal-xterm {
+			min-height: 200px;
+		}
+	}
+</style>

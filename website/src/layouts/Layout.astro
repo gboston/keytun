@@ -34,12 +34,39 @@ const { title, description = "keytun - Lightweight keyboard tunnel for developer
 		<meta name="twitter:description" content={description} />
 		<meta name="twitter:image" content="https://keytun.com/og-image.png" />
 
+		<!-- PostHog analytics -->
+		<script>
+			!function(t,e){var o,n,p,r;e.__SV||(window.posthog && window.posthog.__loaded)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="ci init Pi Ci ft Oi Fi ki capture calculateEventProperties Ui register register_once register_for_session unregister unregister_for_session Bi getFeatureFlag getFeatureFlagPayload getFeatureFlagResult isFeatureEnabled reloadFeatureFlags updateFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey displaySurvey cancelPendingSurvey canRenderSurvey canRenderSurveyAsync identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException startExceptionAutocapture stopExceptionAutocapture loadToolbar get_property getSessionProperty ji Di createPersonProfile setInternalOrTestUser zi Ti Hi opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing get_explicit_consent_status is_capturing clear_opt_in_out_capturing Ai debug bt Ni getPageViewId captureTraceFeedback captureTraceMetric Ei".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+			posthog.init('phc_WbKEYddBj4FuWuP5sP9FVUFkx2Hg4e5ZUnGFmJXADbU', {
+				api_host: 'https://gateway.keytun.com',
+				ui_host: 'https://eu.posthog.com',
+				defaults: '2026-01-30',
+				person_profiles: 'identified_only',
+				opt_out_capturing_by_default: true,
+				opt_out_persistence_by_default: true,
+			})
+
+			// Restore consent from a previous visit
+			if (localStorage.getItem('analytics_consent') === 'yes') {
+				posthog.opt_in_capturing();
+			}
+		</script>
+
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 	</head>
 	<body>
 		<slot />
+
+		<!-- Analytics consent banner -->
+		<div id="consent-banner" class="consent-banner" style="display:none;">
+			<p>We use analytics cookies to understand how you use our site.</p>
+			<div class="consent-actions">
+				<button id="consent-accept" class="consent-btn consent-btn-accept">Accept</button>
+				<button id="consent-decline" class="consent-btn consent-btn-decline">Decline</button>
+			</div>
+		</div>
 		<script>
 			// Scroll-triggered fade-in animations
 			(function() {
@@ -83,6 +110,22 @@ const { title, description = "keytun - Lightweight keyboard tunnel for developer
 				const next = current === 'dark' ? 'light' : 'dark';
 				html.setAttribute('data-theme', next);
 				localStorage.setItem('theme', next);
+			});
+
+			// Analytics consent banner
+			const consent = localStorage.getItem('analytics_consent');
+			const banner = document.getElementById('consent-banner');
+			if (!consent && banner) {
+				banner.style.display = 'flex';
+			}
+			document.getElementById('consent-accept')?.addEventListener('click', () => {
+				localStorage.setItem('analytics_consent', 'yes');
+				window.posthog?.opt_in_capturing();
+				banner?.remove();
+			});
+			document.getElementById('consent-decline')?.addEventListener('click', () => {
+				localStorage.setItem('analytics_consent', 'no');
+				banner?.remove();
 			});
 		</script>
 	</body>
@@ -185,9 +228,9 @@ const { title, description = "keytun - Lightweight keyboard tunnel for developer
 		--keycap-shadow: 0 3px 0 #0d1117, 0 5px 10px rgba(0,0,0,0.3);
 		--keycap-shadow-sm: 0 2px 0 #0d1117, 0 3px 6px rgba(0,0,0,0.2);
 
-		--terminal-bg: #0d1117;
-		--terminal-bar: #161b22;
-		--terminal-border: rgba(255,255,255,0.06);
+		--terminal-bg: #141925;
+		--terminal-bar: #1a2030;
+		--terminal-border: transparent;
 
 		--nav-bg: rgba(26, 26, 46, 0.85);
 		--nav-border: rgba(255, 255, 255, 0.06);
@@ -333,7 +376,7 @@ const { title, description = "keytun - Lightweight keyboard tunnel for developer
 		border-radius: var(--radius);
 		overflow: hidden;
 		border: 1px solid var(--terminal-border);
-		box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+		box-shadow: 0 8px 32px rgba(0,0,0,0.25);
 	}
 
 	.terminal-bar {
@@ -450,6 +493,74 @@ const { title, description = "keytun - Lightweight keyboard tunnel for developer
 	@media (max-width: 768px) {
 		.section {
 			padding: 64px 0;
+		}
+	}
+
+	/* ---- Consent banner ---- */
+	.consent-banner {
+		position: fixed;
+		bottom: 24px;
+		left: 50%;
+		transform: translateX(-50%);
+		display: flex;
+		align-items: center;
+		gap: 16px;
+		padding: 14px 24px;
+		background: var(--bg-card);
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+		z-index: 9999;
+		font-size: 0.9rem;
+		max-width: calc(100% - 48px);
+	}
+
+	.consent-banner p {
+		margin: 0;
+		color: var(--text-dim);
+	}
+
+	.consent-actions {
+		display: flex;
+		gap: 8px;
+		flex-shrink: 0;
+	}
+
+	.consent-btn {
+		padding: 8px 16px;
+		border-radius: var(--radius-sm);
+		font-weight: 600;
+		font-size: 0.85rem;
+		cursor: pointer;
+		border: none;
+		transition: all 0.2s;
+	}
+
+	.consent-btn-accept {
+		background: var(--gradient-primary);
+		color: var(--btn-primary-text);
+	}
+
+	.consent-btn-accept:hover {
+		opacity: 0.9;
+	}
+
+	.consent-btn-decline {
+		background: transparent;
+		color: var(--text-muted);
+		border: 1px solid var(--btn-ghost-border);
+	}
+
+	.consent-btn-decline:hover {
+		color: var(--text-dim);
+		border-color: var(--btn-ghost-hover-border);
+	}
+
+	@media (max-width: 768px) {
+		.consent-banner {
+			flex-direction: column;
+			text-align: center;
+			bottom: 16px;
 		}
 	}
 

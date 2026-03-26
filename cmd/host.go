@@ -41,7 +41,8 @@ var hostCmd = &cobra.Command{
 func runTerminalMode(code string) error {
 	fmt.Printf("keytun %s\n", Version)
 	fmt.Printf("Session: %s\n", code)
-	fmt.Println("Waiting for client... (share the code with your colleague)")
+	fmt.Printf("Join:    https://keytun.com/s/%s\n", code)
+	fmt.Println("Waiting for client... (share the link with your colleague)")
 	fmt.Println()
 
 	inj, err := inject.NewPTY()
@@ -106,6 +107,7 @@ func runSystemMode(code string) error {
 
 	fmt.Printf("keytun %s (system mode)\n", Version)
 	fmt.Printf("Session: %s\n", code)
+	fmt.Printf("Join:    https://keytun.com/s/%s\n", code)
 	if hostTarget != "" {
 		fmt.Printf("Keystrokes will be injected into %s.\n", hostTarget)
 	} else {
