@@ -124,6 +124,7 @@ func TestUnmarshalRoundTrip(t *testing.T) {
 		{Type: MsgError, ErrMessage: "session not found"},
 		{Type: MsgPeerEvent, Event: "joined"},
 		{Type: MsgPeerEvent, Event: "left"},
+		{Type: MsgResize, Cols: 80, Rows: 24},
 	}
 	for _, tc := range cases {
 		data, err := json.Marshal(tc)
@@ -149,6 +150,45 @@ func TestUnmarshalRoundTrip(t *testing.T) {
 		if got.Event != tc.Event {
 			t.Errorf("event = %v, want %v", got.Event, tc.Event)
 		}
+	}
+}
+
+func TestMarshalResize(t *testing.T) {
+	msg := Message{
+		Type: MsgResize,
+		Cols: 120,
+		Rows: 40,
+	}
+	data, err := json.Marshal(msg)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var raw map[string]interface{}
+	json.Unmarshal(data, &raw)
+	if raw["type"] != "resize" {
+		t.Errorf("type = %v, want resize", raw["type"])
+	}
+	if raw["cols"] != float64(120) {
+		t.Errorf("cols = %v, want 120", raw["cols"])
+	}
+	if raw["rows"] != float64(40) {
+		t.Errorf("rows = %v, want 40", raw["rows"])
+	}
+}
+
+func TestResizeOmitsZeroColsRows(t *testing.T) {
+	msg := Message{
+		Type: MsgInput,
+		Data: "aGVsbG8=",
+	}
+	data, _ := json.Marshal(msg)
+	var raw map[string]interface{}
+	json.Unmarshal(data, &raw)
+	if _, ok := raw["cols"]; ok {
+		t.Error("cols field should be omitted when zero")
+	}
+	if _, ok := raw["rows"]; ok {
+		t.Error("rows field should be omitted when zero")
 	}
 }
 

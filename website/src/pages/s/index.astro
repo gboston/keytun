@@ -148,11 +148,17 @@ import Nav from '../../components/Nav.astro';
 			fitAddon.fit();
 			term.focus();
 
-			window.addEventListener('resize', () => fitAddon.fit());
+			// Terminal dimensions are dictated by the host via resize messages,
+			// so we don't auto-fit on browser window resize.
 
 			// Wire output: relay -> terminal
 			client.onOutput = (data: Uint8Array) => {
 				term.write(data);
+			};
+
+			// Wire resize: host sends its terminal dimensions, client adapts
+			client.onResize = (cols: number, rows: number) => {
+				term.resize(cols, rows);
 			};
 
 			// Wire input: terminal -> relay (with escape detection)

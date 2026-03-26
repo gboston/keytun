@@ -163,6 +163,38 @@ func TestHostReceivesRemoteInput(t *testing.T) {
 	}
 }
 
+func TestHostSendsResizeToClient(t *testing.T) {
+	server := setupRelay(t)
+	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+
+	inj := newPTYInjector(t)
+	h, err := New(relayURL, "test-owl-resize", inj)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer h.Close()
+
+	// Simulate a client joining with key exchange
+	clientConn := dialWS(t, server)
+	defer clientConn.Close()
+	simulateClientJoinWithKeyExchange(t, clientConn, "test-owl-resize")
+
+	// Host sends resize
+	h.SendResize(120, 40)
+
+	// Client should receive unencrypted resize message
+	msg := readMsg(t, clientConn)
+	if msg.Type != protocol.MsgResize {
+		t.Errorf("expected resize, got %+v", msg)
+	}
+	if msg.Cols != 120 {
+		t.Errorf("cols = %v, want 120", msg.Cols)
+	}
+	if msg.Rows != 40 {
+		t.Errorf("rows = %v, want 40", msg.Rows)
+	}
+}
+
 func TestHostSendsOutputToClient(t *testing.T) {
 	server := setupRelay(t)
 	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"

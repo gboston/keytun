@@ -57,19 +57,21 @@ func runTerminalMode(code string) error {
 	}
 	defer h.Close()
 
-	// Handle window size changes
+	// Handle window size changes — resize the PTY and notify the client
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGWINCH)
 	go func() {
 		for range ch {
 			if ws, err := pty.GetsizeFull(os.Stdin); err == nil {
 				inj.ResizePTY(ws.Rows, ws.Cols)
+				h.UpdateTermSize(ws.Cols, ws.Rows)
 			}
 		}
 	}()
 	// Set initial size
 	if ws, err := pty.GetsizeFull(os.Stdin); err == nil {
 		inj.ResizePTY(ws.Rows, ws.Cols)
+		h.UpdateTermSize(ws.Cols, ws.Rows)
 	}
 
 	// Switch local terminal to raw mode

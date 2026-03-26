@@ -82,6 +82,7 @@ export class KeytunClient {
 
     // Callbacks (set by consumer)
     this.onOutput = null;
+    this.onResize = null;
     this.onPeerEvent = null;
     this.onError = null;
     this.onClose = null;
@@ -182,6 +183,9 @@ export class KeytunClient {
           } else if (this.onOutput) {
             this.onOutput(msg.data);
           }
+          break;
+        case 'resize':
+          if (this.onResize) this.onResize(msg.cols, msg.rows);
           break;
         case 'peer_event':
           if (this.onPeerEvent) this.onPeerEvent(msg.event);

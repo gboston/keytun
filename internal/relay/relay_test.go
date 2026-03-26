@@ -292,6 +292,47 @@ func TestKeyExchangeFlowsBidirectionally(t *testing.T) {
 	}
 }
 
+func TestResizeFlowsFromHostToClient(t *testing.T) {
+	server, _ := newTestServer(t)
+
+	host := dialWS(t, server)
+	defer host.Close()
+	sendMsg(t, host, protocol.Message{
+		Type:    protocol.MsgHostRegister,
+		Session: "test-fox-resize",
+	})
+
+	client := dialWS(t, server)
+	defer client.Close()
+	sendMsg(t, client, protocol.Message{
+		Type:    protocol.MsgClientJoin,
+		Session: "test-fox-resize",
+	})
+
+	// Read peer_event on host, session_joined on client
+	readMsg(t, host)
+	readMsg(t, client)
+
+	// Host sends resize
+	sendMsg(t, host, protocol.Message{
+		Type: protocol.MsgResize,
+		Cols: 120,
+		Rows: 40,
+	})
+
+	// Client should receive resize
+	msg := readMsg(t, client)
+	if msg.Type != protocol.MsgResize {
+		t.Errorf("expected resize, got %+v", msg)
+	}
+	if msg.Cols != 120 {
+		t.Errorf("cols = %v, want 120", msg.Cols)
+	}
+	if msg.Rows != 40 {
+		t.Errorf("rows = %v, want 40", msg.Rows)
+	}
+}
+
 func TestDuplicateSessionCode(t *testing.T) {
 	server, _ := newTestServer(t)
 

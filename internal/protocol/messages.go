@@ -14,6 +14,7 @@ const (
 	MsgPeerEvent      MessageType = "peer_event"
 	MsgSessionJoined  MessageType = "session_joined"
 	MsgKeyExchange    MessageType = "key_exchange"
+	MsgResize         MessageType = "resize"
 )
 
 // Message is the envelope for all keytun protocol messages.
@@ -25,4 +26,6 @@ type Message struct {
 	Data       string      `json:"data,omitempty"`
 	ErrMessage string      `json:"message,omitempty"`
 	Event      string      `json:"event,omitempty"`
+	Cols       uint16      `json:"cols,omitempty"`
+	Rows       uint16      `json:"rows,omitempty"`
 }

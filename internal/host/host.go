@@ -27,6 +27,8 @@ type Host struct {
 	cryptoSession *crypto.Session
 	keyReady      chan struct{}
 	done          chan struct{}
+	termCols      uint16
+	termRows      uint16
 }
 
 // New creates a new Host that connects to the relay and uses the given injector.
@@ -78,6 +80,24 @@ func New(relayURL string, sessionCode string, injector inject.Injector, localOut
 // SessionCode returns the session code for this host.
 func (h *Host) SessionCode() string {
 	return h.sessionCode
+}
+
+// UpdateTermSize stores the current terminal dimensions and sends them to the client.
+func (h *Host) UpdateTermSize(cols, rows uint16) {
+	h.termCols = cols
+	h.termRows = rows
+	h.SendResize(cols, rows)
+}
+
+// SendResize sends the host's terminal dimensions to the client via the relay.
+func (h *Host) SendResize(cols, rows uint16) {
+	msg := protocol.Message{
+		Type: protocol.MsgResize,
+		Cols: cols,
+		Rows: rows,
+	}
+	data, _ := json.Marshal(msg)
+	h.conn.WriteMessage(websocket.TextMessage, data)
 }
 
 // Close shuts down the host session.
@@ -222,6 +242,11 @@ func (h *Host) readRelayMessages() {
 				}
 				kxData, _ := json.Marshal(kxMsg)
 				h.conn.WriteMessage(websocket.TextMessage, kxData)
+
+				// Send current terminal dimensions so the client can match
+				if h.termCols > 0 && h.termRows > 0 {
+					h.SendResize(h.termCols, h.termRows)
+				}
 			} else if msg.Event == "left" {
 				banner = "\r\n[keytun] client disconnected\r\n"
 			}
