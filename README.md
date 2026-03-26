@@ -52,13 +52,18 @@ go install github.com/gboston/keytun@latest
 ## Quick start
 
 ```bash
-# Terminal 1: Start the relay
+# Host a session (uses relay.keytun.com by default)
+keytun host
+
+# Join the session (use the code from the host output)
+keytun join keen-fox-42
+```
+
+To use a local relay instead:
+
+```bash
 keytun relay --port 8080
-
-# Terminal 2: Host a session
 keytun host --relay ws://localhost:8080/ws
-
-# Terminal 3: Join the session (use the code from the host output)
 keytun join keen-fox-42 --relay ws://localhost:8080/ws
 ```
 
@@ -77,7 +82,7 @@ Starts the WebSocket relay broker.
 Hosts a session and shares a session code with your colleague.
 
 ```
---relay       Relay server URL (default: ws://localhost:8080/ws)
+--relay       Relay server URL (default: wss://relay.keytun.com/ws)
 --mode        Injection mode: "terminal" or "system" (default: terminal)
 --target      Target app name for system mode, e.g. "TextEdit" (macOS only)
 ```
@@ -91,7 +96,7 @@ Hosts a session and shares a session code with your colleague.
 Joins an existing session. Press Escape twice to disconnect.
 
 ```
---relay       Relay server URL (default: ws://localhost:8080/ws)
+--relay       Relay server URL (default: wss://relay.keytun.com/ws)
 ```
 
 ## Security
@@ -116,6 +121,29 @@ just test     # Run all tests
 just clean    # Remove compiled binary
 ```
 
+## Releasing
+
+Releases are automated via [GoReleaser](https://goreleaser.com/) and GitHub Actions.
+
+1. Add an entry in `CHANGELOG.md`
+2. Commit and tag:
+   ```bash
+   git add -A && git commit -m "release: v0.X.Y"
+   git tag v0.X.Y
+   git push origin main --tags
+   ```
+3. The `release.yml` workflow triggers on the `v*` tag push and:
+   - Builds macOS binaries (arm64 + amd64) with CGO disabled
+   - Creates a GitHub Release with the binaries and checksums
+   - Updates the Homebrew cask in `gboston/homebrew-tap`
+
+### Secrets required
+
+| Secret | Purpose |
+|--------|---------|
+| `GITHUB_TOKEN` | Auto-provided by Actions, used for the GitHub Release |
+| `HOMEBREW_TAP_GITHUB_TOKEN` | PAT with write access to `gboston/homebrew-tap` |
+
 ## License
 
-MIT
+AGPL-3.0

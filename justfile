@@ -4,10 +4,10 @@
 binary := "keytun"
 
 build:
-    go build -o {{binary}} .
+    go build -ldflags="-X github.com/gboston/keytun/cmd.Version=dev" -o {{binary}} .
 
 build-linux:
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o {{binary}} .
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X github.com/gboston/keytun/cmd.Version=dev" -o {{binary}} .
 
 test:
     go test ./... -v
