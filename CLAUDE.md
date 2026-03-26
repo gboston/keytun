@@ -8,10 +8,12 @@ Keytun is a lightweight CLI tool that lets remote colleagues type into your term
 
 ## Build & Test Commands
 
+Uses [just](https://github.com/casey/just) as task runner (install via `mise install`).
+
 ```bash
-make build          # Compile binary to ./keytun
-make test           # Run all tests (go test ./... -v)
-make clean          # Remove compiled binary
+just build          # Compile binary to ./keytun
+just test           # Run all tests (go test ./... -v)
+just clean          # Remove compiled binary
 
 go test ./internal/relay/ -v -run TestMessageRouting   # Run a single test
 ```
@@ -39,7 +41,7 @@ Client (stdin) ──WS──▶ Relay (broker) ──WS──▶ Host (PTY)
 
 - **`cmd/`** — Cobra CLI subcommands (`host`, `join`, `relay`). Each wires flags and delegates to the corresponding `internal/` package.
 - **`internal/host/`** — Spawns a PTY (`creack/pty`), sets terminal to raw mode, multiplexes local stdin with remote input from relay.
-- **`internal/client/`** — Connects to relay, reads stdin byte-by-byte, sends keystrokes as base64 JSON. Ctrl+] disconnects.
+- **`internal/client/`** — Connects to relay, reads stdin byte-by-byte, sends keystrokes as base64 JSON. Double-Escape disconnects.
 - **`internal/relay/`** — HTTP server that upgrades `/ws` to WebSocket. Maintains an in-memory session map pairing host↔client connections and routing messages between them.
 - **`internal/protocol/`** — JSON message envelope (`Message` struct with `type`, `session`, `data`, `event`, `message` fields). All I/O data is base64-encoded.
 - **`internal/session/`** — Generates human-readable session codes in `adjective-noun-NN` format from embedded wordlists.

@@ -19,6 +19,7 @@ import (
 
 var hostRelayURL string
 var hostMode string
+var hostTarget string
 
 var hostCmd = &cobra.Command{
 	Use:   "host",
@@ -84,7 +85,14 @@ func runTerminalMode(code string) error {
 }
 
 func runSystemMode(code string) error {
-	inj, err := inject.NewSystem()
+	var inj *inject.SystemInjector
+	var err error
+	if hostTarget != "" {
+		fmt.Printf("Looking up app %q...\n", hostTarget)
+		inj, err = inject.NewSystemWithTarget(hostTarget)
+	} else {
+		inj, err = inject.NewSystem()
+	}
 	if err != nil {
 		return fmt.Errorf("failed to start system injector: %w", err)
 	}
@@ -98,7 +106,11 @@ func runSystemMode(code string) error {
 
 	fmt.Println("keytun v0.1.0 (system mode)")
 	fmt.Printf("Session: %s\n", code)
-	fmt.Println("Keystrokes will be injected into the focused app.")
+	if hostTarget != "" {
+		fmt.Printf("Keystrokes will be injected into %s.\n", hostTarget)
+	} else {
+		fmt.Println("Keystrokes will be injected into the focused app.")
+	}
 	fmt.Println("Press Ctrl+C to stop.")
 
 	// Block until SIGINT/SIGTERM or host done
@@ -106,7 +118,9 @@ func runSystemMode(code string) error {
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	select {
 	case <-sig:
+		fmt.Println("\nStopped.")
 	case <-h.Done():
+		fmt.Println("Session ended.")
 	}
 
 	return nil
@@ -115,4 +129,5 @@ func runSystemMode(code string) error {
 func init() {
 	hostCmd.Flags().StringVar(&hostRelayURL, "relay", "ws://localhost:8080/ws", "relay server WebSocket URL")
 	hostCmd.Flags().StringVar(&hostMode, "mode", "terminal", "injection mode: terminal (PTY) or system (OS-level)")
+	hostCmd.Flags().StringVar(&hostTarget, "target", "", "target app name for system mode (e.g. \"TextEdit\")")
 }

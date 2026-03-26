@@ -55,7 +55,8 @@ var joinCmd = &cobra.Command{
 				action := esc.Feed(buf[i])
 				switch action {
 				case client.Disconnect:
-					fmt.Println("\r\nDisconnected.")
+					term.Restore(int(os.Stdin.Fd()), oldState)
+					fmt.Println("\nDisconnected.")
 					return nil
 				case client.EscapeHeld:
 					// Wait for possible second escape

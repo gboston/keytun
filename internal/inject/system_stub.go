@@ -7,10 +7,17 @@ package inject
 import "fmt"
 
 // SystemInjector is a placeholder on non-macOS platforms.
-type SystemInjector struct{}
+type SystemInjector struct {
+	targetPID int
+}
 
 // NewSystem returns an error because system mode is only supported on macOS.
 func NewSystem() (*SystemInjector, error) {
+	return nil, fmt.Errorf("system mode is only supported on macOS")
+}
+
+// NewSystemWithTarget returns an error because system mode is only supported on macOS.
+func NewSystemWithTarget(appName string) (*SystemInjector, error) {
 	return nil, fmt.Errorf("system mode is only supported on macOS")
 }
 
