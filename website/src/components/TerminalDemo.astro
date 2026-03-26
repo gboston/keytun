@@ -1,0 +1,150 @@
+---
+// ABOUTME: Animated dual terminal demo showing host and client sides of a keytun session.
+// ABOUTME: Lines appear sequentially with a typing effect using IntersectionObserver.
+---
+
+<div class="terminal-wrap">
+	<div class="terminal" id="terminal-host">
+		<div class="terminal-bar">
+			<div class="terminal-dots">
+				<span class="dot dot-red"></span>
+				<span class="dot dot-yellow"></span>
+				<span class="dot dot-green"></span>
+			</div>
+			<span class="terminal-title">Terminal — host</span>
+		</div>
+		<div class="terminal-body">
+			<div class="line anim-line" data-delay="0"><span class="prompt">$</span> <span class="typed" data-text="keytun host"></span></div>
+			<div class="line output anim-line" data-delay="800">  keytun v0.1.0</div>
+			<div class="line output session anim-line" data-delay="1000">  Session: <span class="code-highlight">keen-fox-42</span></div>
+			<div class="line output anim-line" data-delay="1200">  Waiting for client...</div>
+			<div class="line output anim-line" data-delay="3200"></div>
+			<div class="line output peer-event anim-line" data-delay="3400">  ✓ Client connected</div>
+			<div class="line anim-line" data-delay="4200"><span class="prompt">$</span> <span class="typed" data-text="docker compose up -d" data-type-delay="4400"></span><span class="cursor">█</span></div>
+		</div>
+	</div>
+	<div class="terminal terminal-client" id="terminal-client">
+		<div class="terminal-bar">
+			<div class="terminal-dots">
+				<span class="dot dot-red"></span>
+				<span class="dot dot-yellow"></span>
+				<span class="dot dot-green"></span>
+			</div>
+			<span class="terminal-title">Terminal — helper</span>
+		</div>
+		<div class="terminal-body">
+			<div class="line anim-line" data-delay="2000"><span class="prompt">$</span> <span class="typed" data-text="keytun join keen-fox-42"></span></div>
+			<div class="line output anim-line" data-delay="3000">  Connected to <span class="code-highlight">keen-fox-42</span></div>
+			<div class="line output anim-line" data-delay="3200">  You are now typing into the remote terminal.</div>
+			<div class="line output dim anim-line" data-delay="3400">  Press Esc twice to disconnect.</div>
+		</div>
+	</div>
+</div>
+
+<script>
+	function runTerminalAnimation(wrapper: Element) {
+		const lines = wrapper.querySelectorAll<HTMLElement>('.anim-line');
+		const typedSpans = wrapper.querySelectorAll<HTMLElement>('.typed');
+
+		// Hide all lines initially
+		lines.forEach(line => {
+			line.style.opacity = '0';
+			line.style.transform = 'translateY(4px)';
+		});
+
+		// Reveal lines at their configured delays
+		lines.forEach(line => {
+			const delay = parseInt(line.dataset.delay || '0', 10);
+			setTimeout(() => {
+				line.style.transition = 'opacity 0.3s, transform 0.3s';
+				line.style.opacity = '1';
+				line.style.transform = 'translateY(0)';
+			}, delay);
+		});
+
+		// Type out text for elements with the .typed class
+		typedSpans.forEach(span => {
+			const text = span.dataset.text || '';
+			const typeDelay = parseInt(span.dataset.typeDelay || span.closest('.anim-line')?.getAttribute('data-delay') || '0', 10);
+			span.textContent = '';
+
+			let i = 0;
+			const typeChar = () => {
+				if (i < text.length) {
+					span.textContent += text[i];
+					i++;
+					setTimeout(typeChar, 40 + Math.random() * 30);
+				}
+			};
+			// Start typing slightly after the line appears
+			setTimeout(typeChar, typeDelay + 200);
+		});
+	}
+
+	// Use IntersectionObserver so animation plays when terminals scroll into view
+	const wrapper = document.querySelector('.terminal-wrap');
+	if (wrapper) {
+		let hasPlayed = false;
+		const observer = new IntersectionObserver((entries) => {
+			entries.forEach(entry => {
+				if (entry.isIntersecting && !hasPlayed) {
+					hasPlayed = true;
+					runTerminalAnimation(wrapper);
+					observer.disconnect();
+				}
+			});
+		}, { threshold: 0.3 });
+		observer.observe(wrapper);
+	}
+</script>
+
+<style>
+	.terminal-wrap {
+		display: grid;
+		grid-template-columns: 1.3fr 1fr;
+		gap: 24px;
+		max-width: 920px;
+		margin: 0 auto;
+		text-align: left;
+	}
+
+	.line {
+		white-space: nowrap;
+	}
+
+	.dim {
+		opacity: 0.5;
+	}
+
+	@keyframes blink {
+		50% { opacity: 0; }
+	}
+
+	.terminal-body .cursor {
+		animation: blink 1s step-end infinite;
+	}
+
+	.terminal-body .prompt {
+		margin-right: 8px;
+	}
+
+	.terminal-body .code-highlight {
+		font-weight: 600;
+	}
+
+	/* Terminal text colors are always light-on-dark */
+	.terminal-body { color: #6bcb77; }
+	.terminal-body .prompt { color: #6bcb77; }
+	.terminal-body .output { color: #8892a4; }
+	.terminal-body .code-highlight { color: #ffd93d; }
+	.terminal-body .peer-event { color: #6bcb77 !important; }
+	.terminal-body .typing-text,
+	.terminal-body .typed { color: #e8e8e8; }
+	.terminal-body .cursor { color: #ff6b6b; }
+
+	@media (max-width: 768px) {
+		.terminal-wrap {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>

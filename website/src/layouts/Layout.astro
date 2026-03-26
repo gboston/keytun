@@ -1,0 +1,418 @@
+---
+// ABOUTME: Base HTML layout with shared head, fonts, theme toggle script, and CSS variables.
+// ABOUTME: All pages use this layout for consistent structure and theming.
+
+interface Props {
+	title: string;
+	description?: string;
+}
+
+const { title, description = "keytun - Lightweight keyboard tunnel for developers. Think ngrok, but for keystrokes." } = Astro.props;
+---
+
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="viewport" content="width=device-width" />
+		<meta name="description" content={description} />
+		<title>{title}</title>
+
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+	</head>
+	<body>
+		<slot />
+		<script>
+			const toggle = document.getElementById('theme-toggle');
+			const html = document.documentElement;
+
+			// Check for saved preference, then system preference
+			const saved = localStorage.getItem('theme');
+			if (saved) {
+				html.setAttribute('data-theme', saved);
+			} else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+				html.setAttribute('data-theme', 'dark');
+			}
+
+			toggle?.addEventListener('click', () => {
+				const current = html.getAttribute('data-theme');
+				const next = current === 'dark' ? 'light' : 'dark';
+				html.setAttribute('data-theme', next);
+				localStorage.setItem('theme', next);
+			});
+		</script>
+	</body>
+</html>
+
+<style is:global>
+	/* ---- Reset & Base ---- */
+	*, *::before, *::after {
+		margin: 0;
+		padding: 0;
+		box-sizing: border-box;
+	}
+
+	:root {
+		/* NuPhy accent colors - warm keycap tones (shared) */
+		--accent-coral: #e8544e;
+		--accent-peach: #e87a54;
+		--accent-amber: #e8a830;
+		--accent-mint: #3da854;
+		--accent-lavender: #8b6ce0;
+		--accent-sky: #2f9ec4;
+
+		--gradient-primary: linear-gradient(135deg, var(--accent-coral), var(--accent-peach), var(--accent-amber));
+		--gradient-cool: linear-gradient(135deg, var(--accent-sky), var(--accent-lavender));
+
+		--radius: 12px;
+		--radius-sm: 8px;
+
+		--font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+		--font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+
+		/* Light theme (default) */
+		--bg: #ffffff;
+		--bg-surface: #f5f5f7;
+		--bg-card: #ffffff;
+		--bg-elevated: #f0f0f2;
+
+		--text: #1d1d1f;
+		--text-dim: #6e6e73;
+		--text-muted: #a1a1a6;
+
+		--border: rgba(0, 0, 0, 0.08);
+		--border-accent: rgba(232, 84, 78, 0.25);
+
+		--keycap-shadow: 0 3px 0 #d1d1d6, 0 5px 10px rgba(0,0,0,0.08);
+		--keycap-shadow-sm: 0 2px 0 #d1d1d6, 0 3px 6px rgba(0,0,0,0.06);
+
+		--terminal-bg: #1d1d1f;
+		--terminal-bar: #2c2c2e;
+		--terminal-border: rgba(0,0,0,0.1);
+
+		--nav-bg: rgba(255, 255, 255, 0.85);
+		--nav-border: rgba(0, 0, 0, 0.06);
+
+		--code-bg: #f0f0f2;
+		--code-color: var(--accent-coral);
+		--code-border: rgba(0, 0, 0, 0.08);
+
+		--btn-primary-text: #ffffff;
+		--btn-ghost-border: rgba(0, 0, 0, 0.12);
+		--btn-ghost-hover-border: rgba(0, 0, 0, 0.25);
+		--btn-primary-hover-shadow: 0 4px 0 #d1d1d6, 0 8px 20px rgba(0,0,0,0.12);
+		--btn-primary-active-shadow: 0 1px 0 #d1d1d6, 0 2px 4px rgba(0,0,0,0.08);
+
+		--badge-bg: rgba(232, 84, 78, 0.08);
+		--badge-border: rgba(232, 84, 78, 0.15);
+
+		--solution-bg: rgba(232, 122, 84, 0.06);
+		--solution-border: rgba(232, 122, 84, 0.25);
+
+		--msg-type-bg: rgba(232, 84, 78, 0.08);
+		--msg-type-border: rgba(232, 84, 78, 0.12);
+
+		--link-color: var(--accent-sky);
+		--link-hover: var(--accent-coral);
+	}
+
+	[data-theme="dark"] {
+		--bg: #1a1a2e;
+		--bg-surface: #16213e;
+		--bg-card: #1f2b47;
+		--bg-elevated: #253555;
+
+		--text: #e8e8e8;
+		--text-dim: #8892a4;
+		--text-muted: #5a6478;
+
+		--accent-coral: #ff6b6b;
+		--accent-peach: #ffa07a;
+		--accent-amber: #ffd93d;
+		--accent-mint: #6bcb77;
+		--accent-lavender: #a78bfa;
+		--accent-sky: #4cc9f0;
+
+		--gradient-primary: linear-gradient(135deg, var(--accent-coral), var(--accent-peach), var(--accent-amber));
+
+		--border: rgba(255, 255, 255, 0.06);
+		--border-accent: rgba(255, 160, 122, 0.3);
+
+		--keycap-shadow: 0 3px 0 #0d1117, 0 5px 10px rgba(0,0,0,0.3);
+		--keycap-shadow-sm: 0 2px 0 #0d1117, 0 3px 6px rgba(0,0,0,0.2);
+
+		--terminal-bg: #0d1117;
+		--terminal-bar: #161b22;
+		--terminal-border: rgba(255,255,255,0.06);
+
+		--nav-bg: rgba(26, 26, 46, 0.85);
+		--nav-border: rgba(255, 255, 255, 0.06);
+
+		--code-bg: #253555;
+		--code-color: var(--accent-peach);
+		--code-border: rgba(255, 255, 255, 0.08);
+
+		--btn-primary-text: #1a1a2e;
+		--btn-ghost-border: rgba(255, 255, 255, 0.12);
+		--btn-ghost-hover-border: rgba(255, 255, 255, 0.25);
+		--btn-primary-hover-shadow: 0 4px 0 #0d1117, 0 8px 20px rgba(0,0,0,0.4);
+		--btn-primary-active-shadow: 0 1px 0 #0d1117, 0 2px 4px rgba(0,0,0,0.3);
+
+		--badge-bg: rgba(255, 160, 122, 0.1);
+		--badge-border: rgba(255, 160, 122, 0.2);
+
+		--solution-bg: rgba(255, 160, 122, 0.05);
+		--solution-border: rgba(255, 160, 122, 0.3);
+
+		--msg-type-bg: rgba(255, 160, 122, 0.1);
+		--msg-type-border: rgba(255, 160, 122, 0.15);
+
+		--link-color: var(--accent-sky);
+		--link-hover: var(--accent-peach);
+	}
+
+	html {
+		scroll-behavior: smooth;
+	}
+
+	body {
+		font-family: var(--font-sans);
+		background: var(--bg);
+		color: var(--text);
+		line-height: 1.6;
+		-webkit-font-smoothing: antialiased;
+	}
+
+	a {
+		color: var(--link-color);
+		text-decoration: none;
+		transition: color 0.2s;
+	}
+
+	a:hover {
+		color: var(--link-hover);
+	}
+
+	code {
+		font-family: var(--font-mono);
+		font-size: 0.9em;
+		background: var(--code-bg);
+		padding: 2px 7px;
+		border-radius: 5px;
+		color: var(--code-color);
+		border: 1px solid var(--code-border);
+	}
+
+	/* On gray surface sections, make inline code pop with a white bg */
+	.section-dark code {
+		background: var(--bg);
+		border-color: var(--border);
+	}
+
+	.container {
+		max-width: 1100px;
+		margin: 0 auto;
+		padding: 0 24px;
+	}
+
+	/* ---- Sections ---- */
+	.section {
+		padding: 100px 0;
+	}
+
+	.section-dark {
+		background: var(--bg-surface);
+	}
+
+	.section h2 {
+		font-size: clamp(1.8rem, 4vw, 2.4rem);
+		font-weight: 700;
+		text-align: center;
+		margin-bottom: 16px;
+		letter-spacing: -0.01em;
+	}
+
+	.section-sub {
+		text-align: center;
+		color: var(--text-dim);
+		max-width: 500px;
+		margin: 0 auto 48px;
+		font-size: 1.05rem;
+	}
+
+	/* ---- Shared keycap elements ---- */
+	.keycap {
+		width: 52px;
+		height: 52px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 1.5rem;
+		background: var(--bg-elevated);
+		border-radius: var(--radius-sm);
+		box-shadow: var(--keycap-shadow-sm);
+		margin-bottom: 16px;
+	}
+
+	.keycap-bad {
+		background: var(--bg-elevated);
+	}
+
+	.keycap-good {
+		background: linear-gradient(135deg, rgba(232,84,78,0.15), rgba(232,122,84,0.15));
+		border: 1px solid var(--border-accent);
+	}
+
+	[data-theme="dark"] .keycap-good {
+		background: linear-gradient(135deg, rgba(255,107,107,0.2), rgba(255,160,122,0.2));
+	}
+
+	.keycap-small {
+		width: 40px;
+		height: 40px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		font-family: var(--font-mono);
+		font-size: 0.95rem;
+		font-weight: 600;
+		background: var(--bg-elevated);
+		border-radius: var(--radius-sm);
+		box-shadow: var(--keycap-shadow-sm);
+		color: var(--accent-peach);
+		flex-shrink: 0;
+	}
+
+	/* ---- Shared terminal styling ---- */
+	.terminal {
+		background: var(--terminal-bg);
+		border-radius: var(--radius);
+		overflow: hidden;
+		border: 1px solid var(--terminal-border);
+		box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+	}
+
+	.terminal-bar {
+		background: var(--terminal-bar);
+		padding: 10px 16px;
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		border-bottom: 1px solid var(--terminal-border);
+	}
+
+	.terminal-dots {
+		display: flex;
+		gap: 7px;
+	}
+
+	.dot {
+		width: 12px;
+		height: 12px;
+		border-radius: 50%;
+	}
+
+	.dot-red { background: #ff5f57; }
+	.dot-yellow { background: #febc2e; }
+	.dot-green { background: #28c840; }
+
+	.terminal-title {
+		font-family: var(--font-mono);
+		font-size: 0.75rem;
+		color: #5a6478;
+	}
+
+	.terminal-body {
+		padding: 18px 20px;
+		font-family: var(--font-mono);
+		font-size: 0.85rem;
+		line-height: 1.8;
+	}
+
+	.install-terminal {
+		background: var(--terminal-bg);
+		border-radius: var(--radius-sm);
+		padding: 16px 20px;
+		font-family: var(--font-mono);
+		font-size: 0.85rem;
+		overflow-x: auto;
+		border: 1px solid var(--terminal-border);
+	}
+
+	.install-terminal code {
+		background: none;
+		padding: 0;
+		color: #6bcb77;
+		font-size: 0.85rem;
+		border: none;
+	}
+
+	/* ---- Buttons ---- */
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		padding: 14px 28px;
+		border-radius: var(--radius);
+		font-weight: 600;
+		font-size: 1rem;
+		transition: all 0.2s;
+		cursor: pointer;
+	}
+
+	.btn-primary {
+		background: var(--gradient-primary);
+		color: var(--btn-primary-text);
+		box-shadow: var(--keycap-shadow);
+	}
+
+	.btn-primary:hover {
+		transform: translateY(-1px);
+		box-shadow: var(--btn-primary-hover-shadow);
+		color: var(--btn-primary-text);
+	}
+
+	.btn-primary:active {
+		transform: translateY(2px);
+		box-shadow: var(--btn-primary-active-shadow);
+	}
+
+	.btn-ghost {
+		border: 1px solid var(--btn-ghost-border);
+		color: var(--text-dim);
+		background: transparent;
+	}
+
+	.btn-ghost:hover {
+		border-color: var(--btn-ghost-hover-border);
+		color: var(--text);
+	}
+
+	.btn-icon {
+		font-size: 1.1rem;
+	}
+
+	/* Light mode card shadows for depth */
+	:root .problem-card,
+	:root .feature,
+	:root .install-card,
+	:root .protocol-msg {
+		box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+	}
+
+	[data-theme="dark"] .problem-card,
+	[data-theme="dark"] .feature,
+	[data-theme="dark"] .install-card,
+	[data-theme="dark"] .protocol-msg {
+		box-shadow: none;
+	}
+
+	/* ---- Responsive ---- */
+	@media (max-width: 768px) {
+		.section {
+			padding: 64px 0;
+		}
+	}
+</style>

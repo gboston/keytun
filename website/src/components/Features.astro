@@ -1,0 +1,82 @@
+---
+// ABOUTME: Feature grid showcasing keytun's developer-focused qualities.
+// ABOUTME: Six cards with keycap-styled icons for single binary, session codes, etc.
+---
+
+<section class="section" id="features">
+	<div class="container">
+		<h2>Built for developers</h2>
+		<div class="features-grid">
+			<div class="feature">
+				<div class="keycap-small feature-icon">⚡</div>
+				<h3>Single binary</h3>
+				<p>Go binary. No runtime, no dependencies. Download and run.</p>
+			</div>
+			<div class="feature">
+				<div class="keycap-small feature-icon">🔑</div>
+				<h3>Readable session codes</h3>
+				<p>Wordlist-based codes like <code>keen-fox-42</code>. Easy to say over a call.</p>
+			</div>
+			<div class="feature">
+				<div class="keycap-small feature-icon">🖥</div>
+				<h3>Full terminal fidelity</h3>
+				<p>Raw bytes, not characters. Arrow keys, Ctrl sequences, tab completion all preserved.</p>
+			</div>
+			<div class="feature">
+				<div class="keycap-small feature-icon">🔒</div>
+				<h3>Secure by design</h3>
+				<p>Sessions are explicit. Host sees a banner on connect. Ctrl+C kills the session instantly.</p>
+			</div>
+			<div class="feature">
+				<div class="keycap-small feature-icon">☁️</div>
+				<h3>Self-hostable relay</h3>
+				<p>Stateless WebSocket broker. Deploy on Fly.io, Railway, or any container host.</p>
+			</div>
+			<div class="feature">
+				<div class="keycap-small feature-icon">🪶</div>
+				<h3>Lightweight</h3>
+				<p>No database, no auth tokens, no persistence. Sessions live in memory.</p>
+			</div>
+		</div>
+	</div>
+</section>
+
+<style>
+	.features-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+		gap: 20px;
+		margin-top: 48px;
+	}
+
+	.feature {
+		background: var(--bg-card);
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		padding: 28px 24px;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.feature-icon {
+		margin-bottom: 16px;
+	}
+
+	.feature h3 {
+		font-size: 1.05rem;
+		margin-bottom: 8px;
+		font-weight: 600;
+	}
+
+	.feature p {
+		color: var(--text-dim);
+		font-size: 0.92rem;
+		line-height: 1.6;
+	}
+
+	@media (max-width: 768px) {
+		.features-grid {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>

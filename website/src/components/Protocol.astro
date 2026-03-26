@@ -1,0 +1,97 @@
+---
+// ABOUTME: Visual overview of the keytun WebSocket protocol message types.
+// ABOUTME: Shows all seven message types as cards with direction and description.
+---
+
+<section class="section" id="protocol">
+	<div class="container">
+		<h2>Simple protocol</h2>
+		<p class="section-sub">JSON over WebSocket. Seven message types. That's it.</p>
+		<div class="protocol-grid">
+			<div class="protocol-msg">
+				<span class="msg-direction">Host → Relay</span>
+				<code class="msg-type">host_register</code>
+				<p>Register a session code</p>
+			</div>
+			<div class="protocol-msg">
+				<span class="msg-direction">Client → Relay</span>
+				<code class="msg-type">client_join</code>
+				<p>Join an existing session</p>
+			</div>
+			<div class="protocol-msg">
+				<span class="msg-direction">Relay → Client</span>
+				<code class="msg-type">session_joined</code>
+				<p>Confirm session join</p>
+			</div>
+			<div class="protocol-msg">
+				<span class="msg-direction">Client → Host</span>
+				<code class="msg-type">input</code>
+				<p>Base64-encoded key bytes</p>
+			</div>
+			<div class="protocol-msg">
+				<span class="msg-direction">Host → Client</span>
+				<code class="msg-type">output</code>
+				<p>PTY output for remote echo</p>
+			</div>
+			<div class="protocol-msg">
+				<span class="msg-direction">Relay → Both</span>
+				<code class="msg-type">peer_event</code>
+				<p>joined / left notifications</p>
+			</div>
+			<div class="protocol-msg">
+				<span class="msg-direction">Relay → Sender</span>
+				<code class="msg-type">error</code>
+				<p>Error responses</p>
+			</div>
+		</div>
+	</div>
+</section>
+
+<style>
+	.protocol-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+		gap: 16px;
+		margin-top: 48px;
+	}
+
+	.protocol-msg {
+		background: var(--bg-card);
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		padding: 20px;
+		text-align: center;
+	}
+
+	.msg-direction {
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		color: var(--text-muted);
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		display: block;
+		margin-bottom: 8px;
+	}
+
+	.msg-type {
+		font-size: 0.95rem;
+		font-weight: 600;
+		display: inline-block;
+		margin-bottom: 8px;
+		background: var(--msg-type-bg);
+		border: 1px solid var(--msg-type-border);
+		padding: 4px 10px;
+		border-radius: 6px;
+	}
+
+	.protocol-msg p {
+		color: var(--text-dim);
+		font-size: 0.85rem;
+	}
+
+	@media (max-width: 768px) {
+		.protocol-grid {
+			grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+		}
+	}
+</style>

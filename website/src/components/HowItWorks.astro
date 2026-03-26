@@ -1,0 +1,173 @@
+---
+// ABOUTME: Architecture diagram and step-by-step flow of how keytun works.
+// ABOUTME: Shows Host → Relay → Client with keycap-styled node cards.
+---
+
+<section class="section section-dark" id="how-it-works">
+	<div class="container">
+		<h2>How it works</h2>
+		<div class="architecture">
+			<div class="arch-node">
+				<div class="arch-keycap">
+					<span>Host</span>
+				</div>
+				<p>Developer screensharing.<br />Runs <code>keytun host</code></p>
+			</div>
+			<div class="arch-arrow">
+				<div class="arrow-line"></div>
+				<span class="arrow-label">WebSocket</span>
+			</div>
+			<div class="arch-node arch-relay">
+				<div class="arch-keycap arch-keycap-accent">
+					<span>Relay</span>
+				</div>
+				<p>Stateless broker.<br />Bridges connections.</p>
+			</div>
+			<div class="arch-arrow">
+				<div class="arrow-line"></div>
+				<span class="arrow-label">WebSocket</span>
+			</div>
+			<div class="arch-node">
+				<div class="arch-keycap">
+					<span>Client</span>
+				</div>
+				<p>Helper colleague.<br />Runs <code>keytun join &lt;code&gt;</code></p>
+			</div>
+		</div>
+
+		<div class="steps">
+			<div class="step">
+				<div class="step-num keycap-small">1</div>
+				<div class="step-content">
+					<h3>Host starts a session</h3>
+					<p>Run <code>keytun host</code>. A PTY spawns your shell. You get a session code like <code>keen-fox-42</code>.</p>
+				</div>
+			</div>
+			<div class="step">
+				<div class="step-num keycap-small">2</div>
+				<div class="step-content">
+					<h3>Share the code over your call</h3>
+					<p>Session codes use words — easy to read aloud. "keen fox forty-two."</p>
+				</div>
+			</div>
+			<div class="step">
+				<div class="step-num keycap-small">3</div>
+				<div class="step-content">
+					<h3>Helper joins and types</h3>
+					<p>Raw key bytes flow through the relay to the host's PTY. Arrow keys, tab completion, Ctrl+C — everything works.</p>
+				</div>
+			</div>
+			<div class="step">
+				<div class="step-num keycap-small">4</div>
+				<div class="step-content">
+					<h3>Host sees it live</h3>
+					<p>Both local and remote input appear in the same terminal. Your screenshare shows everything in real time.</p>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<style>
+	.architecture {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 12px;
+		margin: 48px 0 64px;
+		flex-wrap: wrap;
+	}
+
+	.arch-node {
+		text-align: center;
+	}
+
+	.arch-keycap {
+		width: 100px;
+		height: 72px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: var(--bg-elevated);
+		border-radius: var(--radius);
+		box-shadow: var(--keycap-shadow);
+		margin: 0 auto 12px;
+		font-family: var(--font-mono);
+		font-weight: 600;
+		font-size: 0.9rem;
+		transition: transform 0.2s;
+	}
+
+	.arch-keycap:hover {
+		transform: translateY(-2px);
+	}
+
+	.arch-keycap-accent {
+		background: var(--gradient-primary);
+		color: var(--btn-primary-text);
+	}
+
+	.arch-node p {
+		font-size: 0.85rem;
+		color: var(--text-dim);
+		max-width: 150px;
+		line-height: 1.5;
+	}
+
+	.arch-arrow {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 6px;
+		padding: 0 8px;
+	}
+
+	.arrow-line {
+		width: 60px;
+		height: 2px;
+		background: linear-gradient(90deg, transparent, var(--text-muted), transparent);
+	}
+
+	.arrow-label {
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		color: var(--text-muted);
+	}
+
+	/* ---- Steps ---- */
+	.steps {
+		max-width: 640px;
+		margin: 0 auto;
+		display: flex;
+		flex-direction: column;
+		gap: 24px;
+	}
+
+	.step {
+		display: flex;
+		gap: 20px;
+		align-items: flex-start;
+	}
+
+	.step-content h3 {
+		font-size: 1.05rem;
+		margin-bottom: 4px;
+	}
+
+	.step-content p {
+		color: var(--text-dim);
+		font-size: 0.92rem;
+		line-height: 1.6;
+	}
+
+	@media (max-width: 768px) {
+		.architecture {
+			flex-direction: column;
+		}
+
+		.arch-arrow {
+			transform: rotate(90deg);
+			padding: 8px 0;
+		}
+	}
+</style>

@@ -1,0 +1,60 @@
+---
+// ABOUTME: Site footer with logo, tagline, and links to GitHub resources.
+// ABOUTME: Minimal footer matching the overall keycap design language.
+---
+
+<footer>
+	<div class="container footer-inner">
+		<div class="footer-logo">
+			<span class="logo-key">⌨</span> keytun
+		</div>
+		<p>Lightweight keyboard tunnel for developers.</p>
+		<div class="footer-links">
+			<a href="https://github.com/gbostoen/keytun">GitHub</a>
+			<span class="footer-sep">·</span>
+			<a href="https://github.com/gbostoen/keytun/issues">Issues</a>
+			<span class="footer-sep">·</span>
+			<a href="https://github.com/gbostoen/keytun/releases">Releases</a>
+		</div>
+	</div>
+</footer>
+
+<style>
+	footer {
+		border-top: 1px solid var(--border);
+		padding: 48px 0;
+	}
+
+	.footer-inner {
+		text-align: center;
+	}
+
+	.footer-logo {
+		font-family: var(--font-mono);
+		font-size: 1.1rem;
+		font-weight: 600;
+		margin-bottom: 8px;
+	}
+
+	.footer-inner > p {
+		color: var(--text-muted);
+		font-size: 0.88rem;
+		margin-bottom: 16px;
+	}
+
+	.footer-links {
+		display: flex;
+		gap: 8px;
+		justify-content: center;
+		align-items: center;
+	}
+
+	.footer-links a {
+		color: var(--text-dim);
+		font-size: 0.88rem;
+	}
+
+	.footer-sep {
+		color: var(--text-muted);
+	}
+</style>

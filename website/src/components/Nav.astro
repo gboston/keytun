@@ -1,0 +1,154 @@
+---
+// ABOUTME: Fixed navigation bar with logo, anchor links, GitHub link, and theme toggle.
+// ABOUTME: Uses backdrop blur and keycap-styled toggle button.
+---
+
+<nav>
+	<div class="nav-inner">
+		<a href="/" class="logo">
+			<span class="logo-key">⌨</span> keytun
+		</a>
+		<div class="nav-links">
+			<a href="#how-it-works">How it works</a>
+			<a href="#install">Install</a>
+			<a href="https://github.com/gbostoen/keytun" class="nav-github">GitHub</a>
+			<button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
+				<span class="toggle-icon toggle-sun">☀</span>
+				<span class="toggle-icon toggle-moon">☾</span>
+			</button>
+		</div>
+	</div>
+</nav>
+
+<style>
+	nav {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		z-index: 100;
+		background: var(--nav-bg);
+		backdrop-filter: blur(16px);
+		border-bottom: 1px solid var(--nav-border);
+	}
+
+	.nav-inner {
+		max-width: 1100px;
+		margin: 0 auto;
+		padding: 0 24px;
+		height: 64px;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.logo {
+		font-family: var(--font-mono);
+		font-size: 1.2rem;
+		font-weight: 600;
+		color: var(--text);
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.logo:hover {
+		color: var(--text);
+	}
+
+	.logo-key {
+		font-size: 1.3rem;
+	}
+
+	.nav-links {
+		display: flex;
+		gap: 28px;
+		align-items: center;
+	}
+
+	.nav-links a {
+		color: var(--text-dim);
+		font-size: 0.9rem;
+		font-weight: 500;
+	}
+
+	.nav-links a:hover {
+		color: var(--text);
+	}
+
+	.nav-github {
+		background: var(--bg-elevated);
+		padding: 6px 14px;
+		border-radius: var(--radius-sm);
+		font-family: var(--font-mono);
+		font-size: 0.85rem !important;
+	}
+
+	.nav-github:hover {
+		background: var(--bg-card);
+	}
+
+	/* ---- Theme Toggle ---- */
+	.theme-toggle {
+		width: 40px;
+		height: 40px;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		background: var(--bg-elevated);
+		box-shadow: var(--keycap-shadow-sm);
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: all 0.2s;
+		position: relative;
+		overflow: hidden;
+	}
+
+	.theme-toggle:hover {
+		transform: translateY(-1px);
+	}
+
+	.theme-toggle:active {
+		transform: translateY(2px);
+		box-shadow: none;
+	}
+
+	.toggle-icon {
+		font-size: 1.1rem;
+		position: absolute;
+		transition: opacity 0.2s, transform 0.2s;
+	}
+
+	.toggle-sun {
+		opacity: 1;
+		transform: scale(1);
+	}
+
+	.toggle-moon {
+		opacity: 0;
+		transform: scale(0.6);
+	}
+
+	:global([data-theme="dark"]) .toggle-sun {
+		opacity: 0;
+		transform: scale(0.6);
+	}
+
+	:global([data-theme="dark"]) .toggle-moon {
+		opacity: 1;
+		transform: scale(1);
+	}
+
+	@media (max-width: 480px) {
+		.nav-links a:not(.nav-github) {
+			display: none;
+		}
+	}
+
+	@media (max-width: 768px) {
+		.nav-links {
+			gap: 16px;
+		}
+	}
+</style>

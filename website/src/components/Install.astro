@@ -1,0 +1,169 @@
+---
+// ABOUTME: Installation instructions section with Go install and from-source options.
+// ABOUTME: Also shows quick-start usage examples for host, client, and relay.
+---
+
+<section class="section section-dark" id="install">
+	<div class="container">
+		<h2>Get started</h2>
+		<div class="install-grid">
+			<div class="install-card">
+				<h3>With Go</h3>
+				<div class="terminal">
+					<div class="terminal-bar">
+						<div class="terminal-dots">
+							<span class="dot dot-red"></span>
+							<span class="dot dot-yellow"></span>
+							<span class="dot dot-green"></span>
+						</div>
+						<span class="terminal-title">Terminal</span>
+					</div>
+					<div class="terminal-body">
+						<div class="line"><span class="prompt">$</span> go install github.com/gbostoen/keytun@latest</div>
+					</div>
+				</div>
+			</div>
+			<div class="install-card">
+				<h3>From source</h3>
+				<div class="terminal">
+					<div class="terminal-bar">
+						<div class="terminal-dots">
+							<span class="dot dot-red"></span>
+							<span class="dot dot-yellow"></span>
+							<span class="dot dot-green"></span>
+						</div>
+						<span class="terminal-title">Terminal</span>
+					</div>
+					<div class="terminal-body">
+						<div class="line"><span class="prompt">$</span> git clone https://github.com/gbostoen/keytun.git</div>
+						<div class="line"><span class="prompt">$</span> cd keytun</div>
+						<div class="line"><span class="prompt">$</span> just build</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="usage-example">
+			<h3>Usage</h3>
+			<div class="usage-grid">
+				<div class="usage-block">
+					<span class="usage-label">Host (developer)</span>
+					<div class="terminal">
+						<div class="terminal-bar">
+							<div class="terminal-dots">
+								<span class="dot dot-red"></span>
+								<span class="dot dot-yellow"></span>
+								<span class="dot dot-green"></span>
+							</div>
+							<span class="terminal-title">Terminal</span>
+						</div>
+						<div class="terminal-body">
+							<div class="line"><span class="prompt">$</span> keytun host</div>
+						</div>
+					</div>
+				</div>
+				<div class="usage-block">
+					<span class="usage-label">Client (helper)</span>
+					<div class="terminal">
+						<div class="terminal-bar">
+							<div class="terminal-dots">
+								<span class="dot dot-red"></span>
+								<span class="dot dot-yellow"></span>
+								<span class="dot dot-green"></span>
+							</div>
+							<span class="terminal-title">Terminal</span>
+						</div>
+						<div class="terminal-body">
+							<div class="line"><span class="prompt">$</span> keytun join keen-fox-42</div>
+						</div>
+					</div>
+				</div>
+				<div class="usage-block">
+					<span class="usage-label">Self-host relay</span>
+					<div class="terminal">
+						<div class="terminal-bar">
+							<div class="terminal-dots">
+								<span class="dot dot-red"></span>
+								<span class="dot dot-yellow"></span>
+								<span class="dot dot-green"></span>
+							</div>
+							<span class="terminal-title">Terminal</span>
+						</div>
+						<div class="terminal-body">
+							<div class="line"><span class="prompt">$</span> keytun relay --addr :8080</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<style>
+	.install-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+		gap: 20px;
+		margin: 48px 0 48px;
+	}
+
+	.install-card {
+		background: var(--bg-card);
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		padding: 28px 24px;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.install-card .terminal {
+		flex: 1;
+	}
+
+	.install-card h3 {
+		font-size: 1rem;
+		font-weight: 600;
+		margin-bottom: 16px;
+	}
+
+	.usage-example {
+		max-width: 700px;
+		margin: 0 auto;
+	}
+
+	.usage-example h3 {
+		font-size: 1.2rem;
+		font-weight: 600;
+		margin-bottom: 20px;
+		text-align: center;
+	}
+
+	.usage-grid {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+
+	.usage-block {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.usage-label {
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		color: var(--text-muted);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.line {
+		white-space: nowrap;
+		color: #e8e8e8;
+	}
+
+	.prompt {
+		color: #6bcb77;
+		margin-right: 8px;
+	}
+</style>

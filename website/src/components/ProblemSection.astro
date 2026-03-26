@@ -1,0 +1,65 @@
+---
+// ABOUTME: Grid of pain-point cards showing why screensharing keyboard control is broken.
+// ABOUTME: Highlights keytun as the solution with a visually distinct card.
+---
+
+<section class="section" id="problem">
+	<div class="container">
+		<h2>The problem with screensharing</h2>
+		<div class="problem-grid">
+			<div class="problem-card">
+				<div class="keycap keycap-bad">🗣</div>
+				<h3>Dictating commands</h3>
+				<p>"Capital D, dash, dash, no-cache, space, dot, no the other dot..."</p>
+			</div>
+			<div class="problem-card">
+				<div class="keycap keycap-bad">🔄</div>
+				<h3>Swapping screen control</h3>
+				<p>Request control, wait for approval, fumble with resolution differences, give it back.</p>
+			</div>
+			<div class="problem-card">
+				<div class="keycap keycap-bad">🛠</div>
+				<h3>Full pair-programming tools</h3>
+				<p>VS Code Live Share, tmate, tmux — all overkill for "let me just type this one command."</p>
+			</div>
+			<div class="problem-card solution">
+				<div class="keycap keycap-good">⌨</div>
+				<h3>keytun</h3>
+				<p>Share a code. They type. You see it live on your screenshare. Done.</p>
+			</div>
+		</div>
+	</div>
+</section>
+
+<style>
+	.problem-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+		gap: 20px;
+		margin-top: 48px;
+	}
+
+	.problem-card {
+		background: var(--bg-card);
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		padding: 28px 24px;
+	}
+
+	.problem-card.solution {
+		border-color: var(--solution-border);
+		background: var(--solution-bg);
+	}
+
+	.problem-card h3 {
+		font-size: 1.05rem;
+		margin-bottom: 8px;
+		font-weight: 600;
+	}
+
+	.problem-card p {
+		color: var(--text-dim);
+		font-size: 0.92rem;
+		line-height: 1.6;
+	}
+</style>
