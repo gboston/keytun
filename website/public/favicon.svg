@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Keycap shape -->
+  <rect x="20" y="24" width="88" height="80" rx="16" fill="#253555" stroke="#3a4a6a" stroke-width="2"/>
+  <rect x="28" y="28" width="72" height="64" rx="10" fill="#1a1a2e"/>
+  <!-- Arrow/tunnel symbol -->
+  <path d="M44 60 L64 44 L84 60 M64 44 V84" stroke="#ffa07a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

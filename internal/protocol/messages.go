@@ -1,0 +1,27 @@
+// ABOUTME: Defines the keytun WebSocket protocol message types.
+// ABOUTME: All messages are JSON with a "type" discriminator field.
+package protocol
+
+// MessageType identifies the kind of protocol message.
+type MessageType string
+
+const (
+	MsgHostRegister MessageType = "host_register"
+	MsgClientJoin   MessageType = "client_join"
+	MsgInput        MessageType = "input"
+	MsgOutput       MessageType = "output"
+	MsgError        MessageType = "error"
+	MsgPeerEvent      MessageType = "peer_event"
+	MsgSessionJoined  MessageType = "session_joined"
+)
+
+// Message is the envelope for all keytun protocol messages.
+// Fields are omitted from JSON when empty, so each message type
+// only serializes the fields it uses.
+type Message struct {
+	Type       MessageType `json:"type"`
+	Session    string      `json:"session,omitempty"`
+	Data       string      `json:"data,omitempty"`
+	ErrMessage string      `json:"message,omitempty"`
+	Event      string      `json:"event,omitempty"`
+}
