@@ -1,0 +1,152 @@
+---
+// ABOUTME: Section explaining keytun's two injection modes: terminal and system.
+// ABOUTME: Side-by-side comparison with usage examples and use cases.
+---
+
+<section class="section section-dark" id="modes">
+	<div class="container">
+		<h2>Two ways to inject keystrokes</h2>
+		<p class="section-sub">Choose the mode that fits your workflow.</p>
+		<div class="modes-grid">
+			<div class="mode-card">
+				<div class="mode-header">
+					<div class="keycap-small">🖥</div>
+					<h3>Terminal mode</h3>
+				</div>
+				<p class="mode-desc">Spawns a full PTY session with your shell. Your colleague types directly into a real terminal — arrow keys, tab completion, Ctrl sequences all work.</p>
+				<div class="terminal">
+					<div class="terminal-bar">
+						<div class="terminal-dots">
+							<span class="dot dot-red"></span>
+							<span class="dot dot-yellow"></span>
+							<span class="dot dot-green"></span>
+						</div>
+						<span class="terminal-title">Terminal</span>
+					</div>
+					<div class="terminal-body">
+						<div class="line"><span class="prompt">$</span> keytun host</div>
+					</div>
+				</div>
+				<ul class="mode-usecases">
+					<li>Run commands together</li>
+					<li>Debug a shell session</li>
+					<li>Pair on infrastructure</li>
+				</ul>
+			</div>
+			<div class="mode-card">
+				<div class="mode-header">
+					<div class="keycap-small">🎯</div>
+					<h3>System mode</h3>
+				</div>
+				<p class="mode-desc">Injects keystrokes at the OS level into any application. Target a specific window by name — your colleague types into your IDE, editor, or any focused app.</p>
+				<div class="terminal">
+					<div class="terminal-bar">
+						<div class="terminal-dots">
+							<span class="dot dot-red"></span>
+							<span class="dot dot-yellow"></span>
+							<span class="dot dot-green"></span>
+						</div>
+						<span class="terminal-title">Terminal</span>
+					</div>
+					<div class="terminal-body">
+						<div class="line"><span class="prompt">$</span> keytun host --mode system</div>
+						<div class="line"><span class="prompt">$</span> keytun host --mode system --target "VS Code"</div>
+					</div>
+				</div>
+				<ul class="mode-usecases">
+					<li>Type into an IDE over screenshare</li>
+					<li>Fill forms in any GUI app</li>
+					<li>Target a specific window by name</li>
+				</ul>
+				<span class="mode-badge">macOS only</span>
+			</div>
+		</div>
+	</div>
+</section>
+
+<style>
+	.modes-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+		gap: 24px;
+		margin-top: 48px;
+	}
+
+	.mode-card {
+		background: var(--bg-card);
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		padding: 32px 28px;
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+		position: relative;
+	}
+
+	.mode-header {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+	}
+
+	.mode-header h3 {
+		font-size: 1.2rem;
+		font-weight: 600;
+	}
+
+	.mode-desc {
+		color: var(--text-dim);
+		font-size: 0.92rem;
+		line-height: 1.6;
+	}
+
+	.mode-usecases {
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		margin-top: 4px;
+	}
+
+	.mode-usecases li {
+		font-size: 0.88rem;
+		color: var(--text-dim);
+		padding-left: 20px;
+		position: relative;
+	}
+
+	.mode-usecases li::before {
+		content: '→';
+		position: absolute;
+		left: 0;
+		color: var(--accent-coral);
+	}
+
+	.mode-badge {
+		display: inline-block;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		color: var(--text-muted);
+		background: var(--bg-elevated);
+		border: 1px solid var(--border);
+		padding: 3px 10px;
+		border-radius: 50px;
+		align-self: flex-start;
+	}
+
+	.line {
+		white-space: nowrap;
+		color: #e8e8e8;
+	}
+
+	.prompt {
+		color: #6bcb77;
+		margin-right: 8px;
+	}
+
+	@media (max-width: 768px) {
+		.modes-grid {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>
