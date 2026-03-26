@@ -1,4 +1,4 @@
-//go:build !darwin
+//go:build !darwin || !cgo
 
 // ABOUTME: Stub SystemInjector for platforms that don't support OS-level keystroke injection.
 // ABOUTME: Returns an error on NewSystem() — system mode is only available on macOS.
