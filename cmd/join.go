@@ -87,5 +87,5 @@ var joinCmd = &cobra.Command{
 }
 
 func init() {
-	joinCmd.Flags().StringVar(&joinRelayURL, "relay", "ws://localhost:8080/ws", "relay server WebSocket URL")
+	joinCmd.Flags().StringVar(&joinRelayURL, "relay", "wss://relay.keytun.com/ws", "relay server WebSocket URL")
 }

@@ -127,7 +127,7 @@ func runSystemMode(code string) error {
 }
 
 func init() {
-	hostCmd.Flags().StringVar(&hostRelayURL, "relay", "ws://localhost:8080/ws", "relay server WebSocket URL")
+	hostCmd.Flags().StringVar(&hostRelayURL, "relay", "wss://relay.keytun.com/ws", "relay server WebSocket URL")
 	hostCmd.Flags().StringVar(&hostMode, "mode", "terminal", "injection mode: terminal (PTY) or system (OS-level)")
 	hostCmd.Flags().StringVar(&hostTarget, "target", "", "target app name for system mode (e.g. \"TextEdit\")")
 }
