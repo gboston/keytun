@@ -2,6 +2,14 @@
 
 All notable changes to keytun are documented in this file.
 
+## [v0.3.0] — 2026-03-27
+
+### Added
+
+- Direct join links: host now prints a `https://keytun.com/s/<code>` URL for easy sharing
+- Web client at `/s/` for joining sessions directly from the browser
+- Cross-language crypto test vectors for JS/Go compatibility
+
 ## [v0.2.0] — 2026-03-26
 
 ### Changed
