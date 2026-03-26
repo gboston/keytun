@@ -1,11 +1,11 @@
 # ABOUTME: GoReleaser configuration for building and distributing keytun.
-# ABOUTME: Builds macOS binaries (arm64 + amd64) and publishes a Homebrew cask.
+# ABOUTME: Builds macOS binaries (arm64 + amd64) with CGO and publishes a Homebrew cask.
 
 version: 2
 
 builds:
   - env:
-      - CGO_ENABLED=0
+      - CGO_ENABLED=1
     goos:
       - darwin
     goarch:
@@ -13,6 +13,19 @@ builds:
       - arm64
     ldflags:
       - -s -w -X github.com/gboston/keytun/cmd.Version={{ .Version }}
+    overrides:
+      - goos: darwin
+        goarch: amd64
+        env:
+          - CGO_ENABLED=1
+          - CC=clang -arch x86_64
+          - CXX=clang++ -arch x86_64
+      - goos: darwin
+        goarch: arm64
+        env:
+          - CGO_ENABLED=1
+          - CC=clang -arch arm64
+          - CXX=clang++ -arch arm64
 
 archives:
   - formats:
