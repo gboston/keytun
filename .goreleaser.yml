@@ -23,6 +23,7 @@ homebrew_casks:
   - repository:
       owner: gboston
       name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: "https://github.com/gboston/keytun"
     description: "Lightweight CLI tool that lets remote colleagues type into your terminal over a screenshare"
     license: "MIT"
