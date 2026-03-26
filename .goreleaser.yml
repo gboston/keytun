@@ -26,7 +26,7 @@ homebrew_casks:
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: "https://github.com/gboston/keytun"
     description: "Lightweight CLI tool that lets remote colleagues type into your terminal over a screenshare"
-    license: "MIT"
+    license: "AGPL-3.0"
 
 checksum:
   name_template: "checksums.txt"
