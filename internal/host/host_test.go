@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gbostoen/keytun/internal/crypto"
-	"github.com/gbostoen/keytun/internal/inject"
-	"github.com/gbostoen/keytun/internal/protocol"
-	"github.com/gbostoen/keytun/internal/relay"
+	"github.com/gboston/keytun/internal/crypto"
+	"github.com/gboston/keytun/internal/inject"
+	"github.com/gboston/keytun/internal/protocol"
+	"github.com/gboston/keytun/internal/relay"
 	"github.com/gorilla/websocket"
 )
 

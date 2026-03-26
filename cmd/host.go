@@ -10,9 +10,9 @@ import (
 	"syscall"
 
 	"github.com/creack/pty"
-	"github.com/gbostoen/keytun/internal/host"
-	"github.com/gbostoen/keytun/internal/inject"
-	"github.com/gbostoen/keytun/internal/session"
+	"github.com/gboston/keytun/internal/host"
+	"github.com/gboston/keytun/internal/inject"
+	"github.com/gboston/keytun/internal/session"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )

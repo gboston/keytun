@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/gbostoen/keytun/internal/client"
+	"github.com/gboston/keytun/internal/client"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )

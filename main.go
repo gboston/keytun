@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gbostoen/keytun/cmd"
+	"github.com/gboston/keytun/cmd"
 )
 
 func main() {

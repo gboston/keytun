@@ -1,0 +1,39 @@
+# ABOUTME: GoReleaser configuration for building and distributing keytun.
+# ABOUTME: Builds macOS binaries (arm64 + amd64) and publishes a Homebrew formula.
+
+version: 2
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+brews:
+  - repository:
+      owner: gboston
+      name: homebrew-tap
+    homepage: "https://github.com/gboston/keytun"
+    description: "Lightweight CLI tool that lets remote colleagues type into your terminal over a screenshare"
+    license: "MIT"
+    install: |
+      bin.install "keytun"
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"

@@ -1,4 +1,4 @@
-module github.com/gbostoen/keytun
+module github.com/gboston/keytun
 
 go 1.25.0
 

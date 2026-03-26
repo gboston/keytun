@@ -7,7 +7,7 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/gbostoen/keytun/internal/relay"
+	"github.com/gboston/keytun/internal/relay"
 	"github.com/spf13/cobra"
 )
 

@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gbostoen/keytun/internal/client"
-	"github.com/gbostoen/keytun/internal/host"
-	"github.com/gbostoen/keytun/internal/inject"
-	"github.com/gbostoen/keytun/internal/relay"
+	"github.com/gboston/keytun/internal/client"
+	"github.com/gboston/keytun/internal/host"
+	"github.com/gboston/keytun/internal/inject"
+	"github.com/gboston/keytun/internal/relay"
 )
 
 func startRelay(t *testing.T) *httptest.Server {

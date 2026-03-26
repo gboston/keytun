@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gbostoen/keytun/internal/protocol"
+	"github.com/gboston/keytun/internal/protocol"
 	"github.com/gorilla/websocket"
 )
 
