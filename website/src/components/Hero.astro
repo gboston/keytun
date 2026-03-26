@@ -6,16 +6,16 @@ import TerminalDemo from './TerminalDemo.astro';
 ---
 
 <section class="hero">
-	<div class="hero-badge">Think ngrok, but for keystrokes</div>
-	<h1>
+	<div class="hero-badge hero-anim" style="--delay: 0">Think ngrok, but for keystrokes</div>
+	<h1 class="hero-anim" style="--delay: 1">
 		Let your colleague<br />
 		<span class="gradient-text">type into your terminal.</span>
 	</h1>
-	<p class="hero-sub">
+	<p class="hero-sub hero-anim" style="--delay: 2">
 		You're screensharing. They need to run a command. Stop dictating characters —
 		give them a session code and let them type directly.
 	</p>
-	<div class="hero-actions">
+	<div class="hero-actions hero-anim" style="--delay: 3">
 		<a href="#install" class="btn btn-primary">
 			<span class="btn-icon">↓</span> Install keytun
 		</a>
@@ -79,6 +79,20 @@ import TerminalDemo from './TerminalDemo.astro';
 	@media (max-width: 768px) {
 		.hero {
 			padding: 120px 20px 60px;
+		}
+	}
+
+	.hero-anim {
+		opacity: 0;
+		transform: translateY(20px);
+		animation: hero-fade-in 0.6s ease-out forwards;
+		animation-delay: calc(var(--delay) * 0.12s + 0.1s);
+	}
+
+	@keyframes hero-fade-in {
+		to {
+			opacity: 1;
+			transform: translateY(0);
 		}
 	}
 

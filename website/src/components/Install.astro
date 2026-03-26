@@ -8,8 +8,8 @@
 		<h2>Get started</h2>
 		<div class="install-grid">
 			<div class="install-card">
-				<h3>With Go</h3>
-				<div class="terminal">
+				<h3>Shell</h3>
+				<div class="terminal" data-copy="curl -fsSL keytun.com/install.sh | sh">
 					<div class="terminal-bar">
 						<div class="terminal-dots">
 							<span class="dot dot-red"></span>
@@ -17,15 +17,19 @@
 							<span class="dot dot-green"></span>
 						</div>
 						<span class="terminal-title">Terminal</span>
+						<button class="copy-btn" aria-label="Copy to clipboard">
+							<svg class="copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+							<svg class="check-icon" style="display:none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+						</button>
 					</div>
 					<div class="terminal-body">
-						<div class="line"><span class="prompt">$</span> go install github.com/gboston/keytun@latest</div>
+						<div class="line"><span class="prompt">$</span> curl -fsSL keytun.com/install.sh | sh</div>
 					</div>
 				</div>
 			</div>
 			<div class="install-card">
-				<h3>From source</h3>
-				<div class="terminal">
+				<h3>Homebrew</h3>
+				<div class="terminal" data-copy="brew install --cask gboston/tap/keytun">
 					<div class="terminal-bar">
 						<div class="terminal-dots">
 							<span class="dot dot-red"></span>
@@ -33,11 +37,13 @@
 							<span class="dot dot-green"></span>
 						</div>
 						<span class="terminal-title">Terminal</span>
+						<button class="copy-btn" aria-label="Copy to clipboard">
+							<svg class="copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+							<svg class="check-icon" style="display:none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+						</button>
 					</div>
 					<div class="terminal-body">
-						<div class="line"><span class="prompt">$</span> git clone https://github.com/gboston/keytun.git</div>
-						<div class="line"><span class="prompt">$</span> cd keytun</div>
-						<div class="line"><span class="prompt">$</span> just build</div>
+						<div class="line"><span class="prompt">$</span> brew install --cask gboston/tap/keytun</div>
 					</div>
 				</div>
 			</div>
@@ -47,7 +53,7 @@
 			<div class="usage-grid">
 				<div class="usage-block">
 					<span class="usage-label">Host (developer)</span>
-					<div class="terminal">
+					<div class="terminal" data-copy="keytun host">
 						<div class="terminal-bar">
 							<div class="terminal-dots">
 								<span class="dot dot-red"></span>
@@ -55,6 +61,10 @@
 								<span class="dot dot-green"></span>
 							</div>
 							<span class="terminal-title">Terminal</span>
+							<button class="copy-btn" aria-label="Copy to clipboard">
+								<svg class="copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+								<svg class="check-icon" style="display:none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+							</button>
 						</div>
 						<div class="terminal-body">
 							<div class="line"><span class="prompt">$</span> keytun host</div>
@@ -63,7 +73,7 @@
 				</div>
 				<div class="usage-block">
 					<span class="usage-label">Client (helper)</span>
-					<div class="terminal">
+					<div class="terminal" data-copy="keytun join keen-fox-42">
 						<div class="terminal-bar">
 							<div class="terminal-dots">
 								<span class="dot dot-red"></span>
@@ -71,28 +81,17 @@
 								<span class="dot dot-green"></span>
 							</div>
 							<span class="terminal-title">Terminal</span>
+							<button class="copy-btn" aria-label="Copy to clipboard">
+								<svg class="copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+								<svg class="check-icon" style="display:none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+							</button>
 						</div>
 						<div class="terminal-body">
 							<div class="line"><span class="prompt">$</span> keytun join keen-fox-42</div>
 						</div>
 					</div>
 				</div>
-				<div class="usage-block">
-					<span class="usage-label">Self-host relay</span>
-					<div class="terminal">
-						<div class="terminal-bar">
-							<div class="terminal-dots">
-								<span class="dot dot-red"></span>
-								<span class="dot dot-yellow"></span>
-								<span class="dot dot-green"></span>
-							</div>
-							<span class="terminal-title">Terminal</span>
-						</div>
-						<div class="terminal-body">
-							<div class="line"><span class="prompt">$</span> keytun relay --addr :8080</div>
-						</div>
-					</div>
-				</div>
+				<p class="relay-note">Connects to <code>relay.keytun.com</code> by default — all traffic is end-to-end encrypted. The relay only sees ciphertext.</p>
 			</div>
 		</div>
 	</div>
@@ -166,4 +165,61 @@
 		color: #6bcb77;
 		margin-right: 8px;
 	}
+
+	.terminal-bar {
+		display: flex;
+		align-items: center;
+	}
+
+	.copy-btn {
+		margin-left: auto;
+		background: none;
+		border: none;
+		color: var(--text-muted);
+		cursor: pointer;
+		padding: 4px;
+		border-radius: 4px;
+		display: flex;
+		align-items: center;
+		transition: color 0.2s;
+	}
+
+	.copy-btn:hover {
+		color: #e8e8e8;
+	}
+
+	.relay-note {
+		font-size: 0.85rem;
+		color: var(--text-dim);
+		text-align: center;
+		margin-top: 8px;
+	}
+
+	.relay-note code {
+		color: var(--text);
+		font-weight: 500;
+	}
 </style>
+
+<script>
+	document.querySelectorAll('.copy-btn').forEach(btn => {
+		btn.addEventListener('click', () => {
+			const terminal = btn.closest('.terminal');
+			const text = terminal?.getAttribute('data-copy');
+			if (!text) return;
+
+			const copyIcon = btn.querySelector('.copy-icon');
+			const checkIcon = btn.querySelector('.check-icon');
+
+			navigator.clipboard.writeText(text).then(() => {
+				copyIcon.style.display = 'none';
+				checkIcon.style.display = 'block';
+				checkIcon.style.color = '#6bcb77';
+				setTimeout(() => {
+					copyIcon.style.display = '';
+					checkIcon.style.display = 'none';
+				}, 1500);
+			});
+		});
+	});
+</script>

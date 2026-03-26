@@ -142,6 +142,15 @@
 	.terminal-body .typed { color: #e8e8e8; }
 	.terminal-body .cursor { color: #ff6b6b; }
 
+	.terminal {
+		transition: transform 0.3s ease, box-shadow 0.3s ease;
+	}
+
+	.terminal:hover {
+		transform: translateY(-4px);
+		box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+	}
+
 	@media (max-width: 768px) {
 		.terminal-wrap {
 			grid-template-columns: 1fr;

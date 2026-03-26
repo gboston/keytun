@@ -36,6 +36,32 @@ const { title, description = "keytun - Lightweight keyboard tunnel for developer
 	<body>
 		<slot />
 		<script>
+			// Scroll-triggered fade-in animations
+			(function() {
+				// Add fade-in class to sections and feature cards
+				document.querySelectorAll('.section, .section-dark').forEach(el => {
+					el.classList.add('fade-in');
+				});
+				document.querySelectorAll('.feature, .install-card, .problem-card').forEach((el, i) => {
+					el.classList.add('fade-in');
+					(el as HTMLElement).style.transitionDelay = `${i * 0.08}s`;
+				});
+
+				const observer = new IntersectionObserver((entries) => {
+					entries.forEach(entry => {
+						if (entry.isIntersecting) {
+							entry.target.classList.add('visible');
+							// Also reveal children with fade-in
+							entry.target.querySelectorAll('.fade-in').forEach(child => {
+								child.classList.add('visible');
+							});
+						}
+					});
+				}, { threshold: 0.15 });
+
+				document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+			})();
+
 			const toggle = document.getElementById('theme-toggle');
 			const html = document.documentElement;
 
@@ -403,10 +429,30 @@ const { title, description = "keytun - Lightweight keyboard tunnel for developer
 		box-shadow: none;
 	}
 
+	/* ---- Scroll animations ---- */
+	.fade-in {
+		opacity: 0;
+		transform: translateY(24px);
+		transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+	}
+
+	.fade-in.visible {
+		opacity: 1;
+		transform: translateY(0);
+	}
+
 	/* ---- Responsive ---- */
 	@media (max-width: 768px) {
 		.section {
 			padding: 64px 0;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.fade-in {
+			opacity: 1;
+			transform: none;
+			transition: none;
 		}
 	}
 </style>

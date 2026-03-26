@@ -11,7 +11,6 @@
 		<div class="nav-links">
 			<a href="#how-it-works">How it works</a>
 			<a href="#install">Install</a>
-			<a href="https://github.com/gboston/keytun" class="nav-github">GitHub</a>
 			<button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
 				<span class="toggle-icon toggle-sun">☀</span>
 				<span class="toggle-icon toggle-moon">☾</span>
@@ -62,7 +61,7 @@
 
 	.nav-links {
 		display: flex;
-		gap: 28px;
+		gap: 24px;
 		align-items: center;
 	}
 
@@ -76,42 +75,25 @@
 		color: var(--text);
 	}
 
-	.nav-github {
-		background: var(--bg-elevated);
-		padding: 6px 14px;
-		border-radius: var(--radius-sm);
-		font-family: var(--font-mono);
-		font-size: 0.85rem !important;
-	}
-
-	.nav-github:hover {
-		background: var(--bg-card);
-	}
-
 	/* ---- Theme Toggle ---- */
 	.theme-toggle {
-		width: 40px;
-		height: 40px;
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
-		background: var(--bg-elevated);
-		box-shadow: var(--keycap-shadow-sm);
+		width: 32px;
+		height: 32px;
+		border: none;
+		border-radius: 50%;
+		background: transparent;
 		cursor: pointer;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		transition: all 0.2s;
+		transition: color 0.2s;
 		position: relative;
 		overflow: hidden;
+		color: var(--text-dim);
 	}
 
 	.theme-toggle:hover {
-		transform: translateY(-1px);
-	}
-
-	.theme-toggle:active {
-		transform: translateY(2px);
-		box-shadow: none;
+		color: var(--text);
 	}
 
 	.toggle-icon {

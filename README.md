@@ -18,6 +18,12 @@ Client (stdin) ──WS──▶ Relay (broker) ──WS──▶ Host (PTY)
 
 ## Install
 
+### Shell (macOS / Linux)
+
+```bash
+curl -fsSL https://keytun.com/install.sh | sh
+```
+
 ### Homebrew (macOS)
 
 ```bash
