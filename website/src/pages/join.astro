@@ -1,0 +1,188 @@
+---
+// ABOUTME: Page where users can enter a session code to join a keytun session.
+// ABOUTME: Optionally allows specifying a relay URL for self-hosted relays.
+import Layout from '../layouts/Layout.astro';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<Layout title="Join a Session — keytun" description="Enter a session code to join a keytun session from your browser.">
+	<Nav />
+	<main>
+		<div class="join-page">
+			<h1>Join a session</h1>
+			<p class="subtitle">Enter the session code your colleague shared with you.</p>
+
+			<form id="join-form" class="join-form">
+				<div class="input-group">
+					<label for="session-code" class="input-label">Session code</label>
+					<input
+						type="text"
+						id="session-code"
+						class="input"
+						placeholder="keen-fox-42"
+						autocomplete="off"
+						autocapitalize="off"
+						spellcheck="false"
+						required
+					/>
+				</div>
+
+				<details class="advanced">
+					<summary>Advanced</summary>
+					<div class="input-group">
+						<label for="relay-url" class="input-label">Relay URL</label>
+						<input
+							type="text"
+							id="relay-url"
+							class="input"
+							placeholder="wss://relay.keytun.com/ws"
+							autocomplete="off"
+							spellcheck="false"
+						/>
+						<span class="input-hint">Leave blank to use the default relay.</span>
+					</div>
+				</details>
+
+				<button type="submit" class="btn btn-primary join-btn">
+					Join session
+				</button>
+			</form>
+		</div>
+	</main>
+	<Footer />
+
+	<script>
+		const form = document.getElementById('join-form') as HTMLFormElement;
+		const codeInput = document.getElementById('session-code') as HTMLInputElement;
+		const relayInput = document.getElementById('relay-url') as HTMLInputElement;
+
+		const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+		form.addEventListener('submit', (e) => {
+			e.preventDefault();
+			const code = codeInput.value.trim();
+			if (!code) return;
+
+			const relay = relayInput.value.trim();
+			const params = new URLSearchParams();
+
+			// In dev mode, Astro can't resolve /s/<code> paths — use query params instead
+			if (isDev) {
+				params.set('session', code);
+			}
+			if (relay) {
+				params.set('relay', relay);
+			}
+
+			const base = isDev ? '/s/' : `/s/${encodeURIComponent(code)}`;
+			const qs = params.toString();
+			window.location.href = qs ? `${base}?${qs}` : base;
+		});
+
+		// Auto-focus the session code input
+		codeInput.focus();
+	</script>
+</Layout>
+
+<style>
+	main {
+		min-height: 100vh;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 120px 24px 80px;
+	}
+
+	.join-page {
+		width: 100%;
+		max-width: 460px;
+		text-align: center;
+	}
+
+	h1 {
+		font-size: clamp(1.8rem, 4vw, 2.4rem);
+		font-weight: 700;
+		margin-bottom: 12px;
+		letter-spacing: -0.01em;
+	}
+
+	.subtitle {
+		color: var(--text-dim);
+		font-size: 1.05rem;
+		margin-bottom: 40px;
+	}
+
+	.join-form {
+		text-align: left;
+	}
+
+	.input-group {
+		margin-bottom: 20px;
+	}
+
+	.input-label {
+		display: block;
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: var(--text-dim);
+		margin-bottom: 8px;
+	}
+
+	.input {
+		width: 100%;
+		padding: 14px 16px;
+		font-family: var(--font-mono);
+		font-size: 1rem;
+		background: var(--bg-elevated);
+		color: var(--text);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		outline: none;
+		transition: border-color 0.2s;
+	}
+
+	.input::placeholder {
+		color: var(--text-muted);
+	}
+
+	.input:focus {
+		border-color: var(--accent-coral);
+	}
+
+	.input-hint {
+		display: block;
+		font-size: 0.8rem;
+		color: var(--text-muted);
+		margin-top: 6px;
+	}
+
+	.advanced {
+		margin-bottom: 24px;
+	}
+
+	.advanced summary {
+		font-size: 0.85rem;
+		font-weight: 500;
+		color: var(--text-muted);
+		cursor: pointer;
+		margin-bottom: 16px;
+		user-select: none;
+	}
+
+	.advanced summary:hover {
+		color: var(--text-dim);
+	}
+
+	.join-btn {
+		width: 100%;
+		justify-content: center;
+		border: none;
+	}
+
+	@media (max-width: 480px) {
+		main {
+			padding: 100px 20px 60px;
+		}
+	}
+</style>

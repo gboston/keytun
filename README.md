@@ -59,7 +59,20 @@ keytun host
 keytun join keen-fox-42
 ```
 
-To use a local relay instead:
+### Join from the browser
+
+Your colleague doesn't need to install anything. When you run `keytun host`, it prints a direct join link:
+
+```
+Join:    https://keytun.com/s/keen-fox-42
+```
+
+Share that URL and they can type into your terminal straight from their browser.
+You can also go to [keytun.com/join](https://keytun.com/join) and enter a session code manually.
+
+### Local relay
+
+To use a local relay instead of the default:
 
 ```bash
 keytun relay --port 8080
