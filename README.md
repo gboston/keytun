@@ -1,10 +1,23 @@
-# keytun
+<p align="center">
+  <img src="website/public/favicon.svg" width="80" height="80" alt="keytun logo" />
+</p>
 
-> Think ngrok, but for keystrokes.
+<h1 align="center">keytun</h1>
 
-**keytun** is a lightweight CLI tool that lets remote colleagues type into your terminal over a screenshare. A WebSocket relay broker connects a **host** (who shares their terminal) with a **client** (who sends keystrokes) — all end-to-end encrypted.
+<p align="center">
+  <strong>Think ngrok, but for keystrokes.</strong><br/>
+  <sub>Let your colleague type into your terminal over a screenshare.</sub>
+</p>
 
-## How it works
+<p align="center">
+  <a href="#install">Install</a> •
+  <a href="#quick-start">Quick start</a> •
+  <a href="#commands">Commands</a> •
+  <a href="#security">Security</a> •
+  <a href="https://keytun.com">Website</a>
+</p>
+
+---
 
 ```
 Client (stdin) ──WS──▶ Relay (broker) ──WS──▶ Host (PTY)
@@ -85,9 +98,11 @@ Joins an existing session. Press Escape twice to disconnect.
 
 All data between host and client is end-to-end encrypted. The relay only sees opaque ciphertext.
 
-- **Key exchange:** X25519 ECDH
-- **Encryption:** AES-256-GCM
-- **Key derivation:** HKDF-SHA256
+| Layer | Algorithm |
+|-------|-----------|
+| Key exchange | X25519 ECDH |
+| Encryption | AES-256-GCM |
+| Key derivation | HKDF-SHA256 |
 
 The relay is a dumb pipe — it cannot read keystrokes or terminal output.
 
