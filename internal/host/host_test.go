@@ -3,6 +3,7 @@
 package host
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gbostoen/keytun/internal/crypto"
 	"github.com/gbostoen/keytun/internal/inject"
 	"github.com/gbostoen/keytun/internal/protocol"
 	"github.com/gbostoen/keytun/internal/relay"
@@ -71,6 +73,45 @@ func newPTYInjector(t *testing.T) *inject.PTYInjector {
 	return p
 }
 
+// simulateClientJoinWithKeyExchange joins a session as a raw WS client and
+// performs the encryption key exchange with the host. Returns the crypto
+// session for encrypting/decrypting messages.
+func simulateClientJoinWithKeyExchange(t *testing.T, conn *websocket.Conn, session string) *crypto.Session {
+	t.Helper()
+	// Send client_join
+	sendMsg(t, conn, protocol.Message{
+		Type:    protocol.MsgClientJoin,
+		Session: session,
+	})
+	// Read session_joined ack
+	readMsg(t, conn)
+
+	// Create crypto session and send our public key
+	sess, err := crypto.NewSession()
+	if err != nil {
+		t.Fatalf("crypto.NewSession: %v", err)
+	}
+	pubEncoded := base64.StdEncoding.EncodeToString(sess.PublicKey())
+	sendMsg(t, conn, protocol.Message{
+		Type: protocol.MsgKeyExchange,
+		Data: pubEncoded,
+	})
+
+	// Read host's key_exchange
+	kxMsg := readMsg(t, conn)
+	if kxMsg.Type != protocol.MsgKeyExchange {
+		t.Fatalf("expected key_exchange, got %+v", kxMsg)
+	}
+	peerPub, err := base64.StdEncoding.DecodeString(kxMsg.Data)
+	if err != nil {
+		t.Fatalf("decode peer pub: %v", err)
+	}
+	if err := sess.Complete(peerPub); err != nil {
+		t.Fatalf("complete key exchange: %v", err)
+	}
+	return sess
+}
+
 func TestHostConnectsAndRegisters(t *testing.T) {
 	server := setupRelay(t)
 	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
@@ -98,21 +139,21 @@ func TestHostReceivesRemoteInput(t *testing.T) {
 	}
 	defer h.Close()
 
-	// Simulate a client joining and sending input
-	client := dialWS(t, server)
-	defer client.Close()
-	sendMsg(t, client, protocol.Message{
-		Type:    protocol.MsgClientJoin,
-		Session: "test-owl-12",
-	})
+	// Simulate a client joining with key exchange
+	clientConn := dialWS(t, server)
+	defer clientConn.Close()
+	clientSess := simulateClientJoinWithKeyExchange(t, clientConn, "test-owl-12")
 
-	// Wait a moment for the connection to be established
-	time.Sleep(100 * time.Millisecond)
-
-	// Send some input from the client (echo command + newline)
-	sendMsg(t, client, protocol.Message{
+	// Send encrypted input from the client (echo command + newline)
+	plaintext := []byte("echo hello\n")
+	encrypted, err := clientSess.Encrypt(plaintext)
+	if err != nil {
+		t.Fatalf("encrypt: %v", err)
+	}
+	encoded := base64.StdEncoding.EncodeToString(encrypted)
+	sendMsg(t, clientConn, protocol.Message{
 		Type: protocol.MsgInput,
-		Data: "ZWNobyBoZWxsbwo=", // "echo hello\n"
+		Data: encoded,
 	})
 
 	// Read PTY output from the host — it should eventually contain "hello"
@@ -133,34 +174,41 @@ func TestHostSendsOutputToClient(t *testing.T) {
 	}
 	defer h.Close()
 
-	// Simulate a client joining
-	client := dialWS(t, server)
-	defer client.Close()
-	sendMsg(t, client, protocol.Message{
-		Type:    protocol.MsgClientJoin,
-		Session: "test-owl-13",
-	})
+	// Simulate a client joining with key exchange
+	clientConn := dialWS(t, server)
+	defer clientConn.Close()
+	clientSess := simulateClientJoinWithKeyExchange(t, clientConn, "test-owl-13")
 
-	time.Sleep(100 * time.Millisecond)
-
-	// Send input that produces output
-	sendMsg(t, client, protocol.Message{
+	// Send encrypted input that produces output
+	plaintext := []byte("echo world\n")
+	encrypted, err := clientSess.Encrypt(plaintext)
+	if err != nil {
+		t.Fatalf("encrypt: %v", err)
+	}
+	encoded := base64.StdEncoding.EncodeToString(encrypted)
+	sendMsg(t, clientConn, protocol.Message{
 		Type: protocol.MsgInput,
-		Data: "ZWNobyB3b3JsZAo=", // "echo world\n"
+		Data: encoded,
 	})
 
-	// Client should receive output messages
+	// Client should receive encrypted output messages
 	deadline := time.Now().Add(5 * time.Second)
 	found := false
 	for time.Now().Before(deadline) {
-		client.SetReadDeadline(time.Now().Add(2 * time.Second))
-		_, data, err := client.ReadMessage()
+		clientConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		_, data, err := clientConn.ReadMessage()
 		if err != nil {
 			break
 		}
 		var msg protocol.Message
 		json.Unmarshal(data, &msg)
 		if msg.Type == protocol.MsgOutput && msg.Data != "" {
+			// Verify we can decrypt the output
+			ciphertext, _ := base64.StdEncoding.DecodeString(msg.Data)
+			_, decErr := clientSess.Decrypt(ciphertext)
+			if decErr != nil {
+				t.Fatalf("failed to decrypt output: %v", decErr)
+			}
 			found = true
 			break
 		}

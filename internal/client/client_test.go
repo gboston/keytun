@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gbostoen/keytun/internal/crypto"
 	"github.com/gbostoen/keytun/internal/protocol"
 	"github.com/gbostoen/keytun/internal/relay"
 	"github.com/gorilla/websocket"
@@ -61,6 +62,58 @@ func readMsg(t *testing.T, conn *websocket.Conn) protocol.Message {
 	return msg
 }
 
+// hostKeyExchangeResult holds the result of a background host key exchange.
+type hostKeyExchangeResult struct {
+	session *crypto.Session
+	err     error
+}
+
+// startHostKeyExchange runs the host-side key exchange in a goroutine. This is
+// needed because client.New() blocks until key exchange completes, so the raw
+// WS host must handle it concurrently. Call this BEFORE client.New().
+func startHostKeyExchange(t *testing.T, conn *websocket.Conn) <-chan hostKeyExchangeResult {
+	t.Helper()
+	ch := make(chan hostKeyExchangeResult, 1)
+	go func() {
+		// Read peer_event{joined} from relay
+		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		_, data, err := conn.ReadMessage()
+		if err != nil {
+			ch <- hostKeyExchangeResult{err: err}
+			return
+		}
+		var msg protocol.Message
+		json.Unmarshal(data, &msg)
+
+		// Read key_exchange from client (forwarded by relay)
+		_, data, err = conn.ReadMessage()
+		if err != nil {
+			ch <- hostKeyExchangeResult{err: err}
+			return
+		}
+		var kxMsg protocol.Message
+		json.Unmarshal(data, &kxMsg)
+
+		// Create crypto session, complete with client's key, send ours
+		sess, _ := crypto.NewSession()
+		peerPub, _ := base64.StdEncoding.DecodeString(kxMsg.Data)
+		if err := sess.Complete(peerPub); err != nil {
+			ch <- hostKeyExchangeResult{err: err}
+			return
+		}
+		pubEncoded := base64.StdEncoding.EncodeToString(sess.PublicKey())
+		respData, _ := json.Marshal(protocol.Message{
+			Type: protocol.MsgKeyExchange,
+			Data: pubEncoded,
+		})
+		conn.WriteMessage(websocket.TextMessage, respData)
+		conn.SetReadDeadline(time.Time{})
+
+		ch <- hostKeyExchangeResult{session: sess}
+	}()
+	return ch
+}
+
 func TestClientConnectsToSession(t *testing.T) {
 	server := setupRelay(t)
 	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
@@ -73,16 +126,18 @@ func TestClientConnectsToSession(t *testing.T) {
 		Session: "test-rat-10",
 	})
 
+	// Start host-side key exchange in background before client.New() blocks
+	kxCh := startHostKeyExchange(t, host)
+
 	c, err := New(relayURL, "test-rat-10")
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
 	defer c.Close()
 
-	// Host should get peer_event "joined"
-	msg := readMsg(t, host)
-	if msg.Type != protocol.MsgPeerEvent || msg.Event != "joined" {
-		t.Errorf("expected peer_event joined, got %+v", msg)
+	result := <-kxCh
+	if result.err != nil {
+		t.Fatalf("host key exchange: %v", result.err)
 	}
 }
 
@@ -97,31 +152,40 @@ func TestClientSendsInput(t *testing.T) {
 		Session: "test-rat-11",
 	})
 
+	kxCh := startHostKeyExchange(t, host)
+
 	c, err := New(relayURL, "test-rat-11")
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
 	defer c.Close()
 
-	// Read the peer_event on host side
-	readMsg(t, host)
+	result := <-kxCh
+	if result.err != nil {
+		t.Fatalf("host key exchange: %v", result.err)
+	}
 
 	// Send input through the client
 	if err := c.SendInput([]byte("hello")); err != nil {
 		t.Fatalf("SendInput: %v", err)
 	}
 
-	// Host should receive the input message
+	// Host should receive the encrypted input message
 	msg := readMsg(t, host)
 	if msg.Type != protocol.MsgInput {
 		t.Fatalf("expected input, got %+v", msg)
 	}
-	decoded, err := base64.StdEncoding.DecodeString(msg.Data)
+	// Data is encrypted — decrypt it with the host's crypto session
+	ciphertext, err := base64.StdEncoding.DecodeString(msg.Data)
 	if err != nil {
-		t.Fatalf("decode: %v", err)
+		t.Fatalf("decode base64: %v", err)
 	}
-	if string(decoded) != "hello" {
-		t.Errorf("data = %q, want %q", string(decoded), "hello")
+	plaintext, err := result.session.Decrypt(ciphertext)
+	if err != nil {
+		t.Fatalf("decrypt: %v", err)
+	}
+	if string(plaintext) != "hello" {
+		t.Errorf("data = %q, want %q", string(plaintext), "hello")
 	}
 }
 
@@ -146,14 +210,18 @@ func TestClientSendsControlSequences(t *testing.T) {
 		Session: "test-rat-12",
 	})
 
+	kxCh := startHostKeyExchange(t, host)
+
 	c, err := New(relayURL, "test-rat-12")
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
 	defer c.Close()
 
-	// Read the peer_event
-	readMsg(t, host)
+	result := <-kxCh
+	if result.err != nil {
+		t.Fatalf("host key exchange: %v", result.err)
+	}
 
 	// Send Ctrl+C (0x03)
 	if err := c.SendInput([]byte{0x03}); err != nil {
@@ -161,8 +229,12 @@ func TestClientSendsControlSequences(t *testing.T) {
 	}
 
 	msg := readMsg(t, host)
-	decoded, _ := base64.StdEncoding.DecodeString(msg.Data)
-	if len(decoded) != 1 || decoded[0] != 0x03 {
-		t.Errorf("expected Ctrl+C byte (0x03), got %v", decoded)
+	ciphertext, _ := base64.StdEncoding.DecodeString(msg.Data)
+	plaintext, err := result.session.Decrypt(ciphertext)
+	if err != nil {
+		t.Fatalf("decrypt: %v", err)
+	}
+	if len(plaintext) != 1 || plaintext[0] != 0x03 {
+		t.Errorf("expected Ctrl+C byte (0x03), got %v", plaintext)
 	}
 }

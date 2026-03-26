@@ -13,6 +13,7 @@ const (
 	MsgError        MessageType = "error"
 	MsgPeerEvent      MessageType = "peer_event"
 	MsgSessionJoined  MessageType = "session_joined"
+	MsgKeyExchange    MessageType = "key_exchange"
 )
 
 // Message is the envelope for all keytun protocol messages.

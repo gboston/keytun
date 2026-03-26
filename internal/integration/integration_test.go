@@ -3,7 +3,6 @@
 package integration
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,9 +12,7 @@ import (
 	"github.com/gbostoen/keytun/internal/client"
 	"github.com/gbostoen/keytun/internal/host"
 	"github.com/gbostoen/keytun/internal/inject"
-	"github.com/gbostoen/keytun/internal/protocol"
 	"github.com/gbostoen/keytun/internal/relay"
-	"github.com/gorilla/websocket"
 )
 
 func startRelay(t *testing.T) *httptest.Server {
@@ -175,47 +172,21 @@ func TestEndToEnd_HostOutputReachesClient(t *testing.T) {
 	}
 	defer h.Close()
 
-	// Connect raw WebSocket as client to read output messages directly
-	wsConn, _, err := websocket.DefaultDialer.Dial(url, nil)
+	// Use a real client so encryption handshake is handled automatically
+	c, err := client.New(url, "e2e-fox-46")
 	if err != nil {
-		t.Fatalf("dial: %v", err)
+		t.Fatalf("client.New: %v", err)
 	}
-	defer wsConn.Close()
-
-	joinMsg, _ := json.Marshal(protocol.Message{
-		Type:    protocol.MsgClientJoin,
-		Session: "e2e-fox-46",
-	})
-	wsConn.WriteMessage(websocket.TextMessage, joinMsg)
-
-	// Read session_joined ack
-	wsConn.SetReadDeadline(time.Now().Add(3 * time.Second))
-	wsConn.ReadMessage()
+	defer c.Close()
 
 	// Send a command that produces output
-	inputMsg, _ := json.Marshal(protocol.Message{
-		Type: protocol.MsgInput,
-		Data: "ZWNobyByZWxheS10ZXN0Cg==", // "echo relay-test\n"
-	})
-	wsConn.WriteMessage(websocket.TextMessage, inputMsg)
-
-	// Read output messages from the relay
-	deadline := time.Now().Add(5 * time.Second)
-	found := false
-	for time.Now().Before(deadline) {
-		wsConn.SetReadDeadline(time.Now().Add(2 * time.Second))
-		_, data, err := wsConn.ReadMessage()
-		if err != nil {
-			break
-		}
-		var msg protocol.Message
-		json.Unmarshal(data, &msg)
-		if msg.Type == protocol.MsgOutput {
-			found = true
-			break
-		}
+	if err := c.SendInput([]byte("echo relay-test\n")); err != nil {
+		t.Fatalf("SendInput: %v", err)
 	}
-	if !found {
-		t.Error("expected to receive output messages from host via relay")
+
+	// Host should see the output (proves the encrypted round-trip works)
+	output := h.ReadOutputUntil("relay-test", 5*time.Second)
+	if !strings.Contains(output, "relay-test") {
+		t.Errorf("expected host output to contain 'relay-test', got: %q", output)
 	}
 }

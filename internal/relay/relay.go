@@ -120,8 +120,8 @@ func (r *Relay) handleHost(conn *websocket.Conn, code string) {
 			continue
 		}
 
-		// Forward output messages to client
-		if msg.Type == protocol.MsgOutput {
+		// Forward output and key exchange messages to client
+		if msg.Type == protocol.MsgOutput || msg.Type == protocol.MsgKeyExchange {
 			if err := client.WriteMessage(websocket.TextMessage, data); err != nil {
 				continue
 			}
@@ -180,8 +180,8 @@ func (r *Relay) handleClient(conn *websocket.Conn, code string) {
 			continue
 		}
 
-		// Forward input messages to host
-		if msg.Type == protocol.MsgInput {
+		// Forward input and key exchange messages to host
+		if msg.Type == protocol.MsgInput || msg.Type == protocol.MsgKeyExchange {
 			if err := sess.host.WriteMessage(websocket.TextMessage, data); err != nil {
 				return
 			}

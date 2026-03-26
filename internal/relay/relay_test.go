@@ -244,6 +244,54 @@ func TestClientDisconnectSendsPeerEvent(t *testing.T) {
 	}
 }
 
+func TestKeyExchangeFlowsBidirectionally(t *testing.T) {
+	server, _ := newTestServer(t)
+
+	host := dialWS(t, server)
+	defer host.Close()
+	sendMsg(t, host, protocol.Message{
+		Type:    protocol.MsgHostRegister,
+		Session: "test-fox-kx",
+	})
+
+	client := dialWS(t, server)
+	defer client.Close()
+	sendMsg(t, client, protocol.Message{
+		Type:    protocol.MsgClientJoin,
+		Session: "test-fox-kx",
+	})
+
+	// Read peer_event on host, session_joined on client
+	readMsg(t, host)
+	readMsg(t, client)
+
+	// Host sends key_exchange → client should receive it
+	sendMsg(t, host, protocol.Message{
+		Type: protocol.MsgKeyExchange,
+		Data: "aG9zdC1wdWJrZXk=",
+	})
+	msg := readMsg(t, client)
+	if msg.Type != protocol.MsgKeyExchange {
+		t.Errorf("client expected key_exchange, got %+v", msg)
+	}
+	if msg.Data != "aG9zdC1wdWJrZXk=" {
+		t.Errorf("client data = %v, want aG9zdC1wdWJrZXk=", msg.Data)
+	}
+
+	// Client sends key_exchange → host should receive it
+	sendMsg(t, client, protocol.Message{
+		Type: protocol.MsgKeyExchange,
+		Data: "Y2xpZW50LXB1YmtleQ==",
+	})
+	msg = readMsg(t, host)
+	if msg.Type != protocol.MsgKeyExchange {
+		t.Errorf("host expected key_exchange, got %+v", msg)
+	}
+	if msg.Data != "Y2xpZW50LXB1YmtleQ==" {
+		t.Errorf("host data = %v, want Y2xpZW50LXB1YmtleQ==", msg.Data)
+	}
+}
+
 func TestDuplicateSessionCode(t *testing.T) {
 	server, _ := newTestServer(t)
 

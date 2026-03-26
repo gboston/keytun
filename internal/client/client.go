@@ -8,14 +8,16 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gbostoen/keytun/internal/crypto"
 	"github.com/gbostoen/keytun/internal/protocol"
 	"github.com/gorilla/websocket"
 )
 
 // Client manages a keytun client session.
 type Client struct {
-	conn *websocket.Conn
-	done chan struct{}
+	conn          *websocket.Conn
+	cryptoSession *crypto.Session
+	done          chan struct{}
 }
 
 // New creates a new Client that connects to the relay and joins a session.
@@ -59,19 +61,67 @@ func New(relayURL string, sessionCode string) (*Client, error) {
 		return nil, fmt.Errorf("unexpected relay response: %s", resp.Type)
 	}
 
+	// Perform key exchange: create session, send our public key, read peer's
+	sess, err := crypto.NewSession()
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("crypto session: %w", err)
+	}
+	pubEncoded := base64.StdEncoding.EncodeToString(sess.PublicKey())
+	kxMsg := protocol.Message{
+		Type: protocol.MsgKeyExchange,
+		Data: pubEncoded,
+	}
+	kxData, _ := json.Marshal(kxMsg)
+	if err := conn.WriteMessage(websocket.TextMessage, kxData); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("send key exchange: %w", err)
+	}
+
+	// Read the host's key_exchange message
+	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	_, kxPeek, err := conn.ReadMessage()
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("read key exchange: %w", err)
+	}
+	var kxResp protocol.Message
+	if err := json.Unmarshal(kxPeek, &kxResp); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("invalid key exchange response")
+	}
+	if kxResp.Type != protocol.MsgKeyExchange {
+		conn.Close()
+		return nil, fmt.Errorf("expected key_exchange, got %s", kxResp.Type)
+	}
+	peerPub, err := base64.StdEncoding.DecodeString(kxResp.Data)
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("decode peer public key: %w", err)
+	}
+	if err := sess.Complete(peerPub); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("key exchange: %w", err)
+	}
+
 	conn.SetReadDeadline(time.Time{})
 
 	c := &Client{
-		conn: conn,
-		done: make(chan struct{}),
+		conn:          conn,
+		cryptoSession: sess,
+		done:          make(chan struct{}),
 	}
 
 	return c, nil
 }
 
-// SendInput sends raw bytes as an input message to the relay.
+// SendInput encrypts and sends raw bytes as an input message to the relay.
 func (c *Client) SendInput(input []byte) error {
-	encoded := base64.StdEncoding.EncodeToString(input)
+	encrypted, err := c.cryptoSession.Encrypt(input)
+	if err != nil {
+		return err
+	}
+	encoded := base64.StdEncoding.EncodeToString(encrypted)
 	msg := protocol.Message{
 		Type: protocol.MsgInput,
 		Data: encoded,
