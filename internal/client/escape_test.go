@@ -108,6 +108,27 @@ func TestEscapeDetector_FlushBeforeTimeout(t *testing.T) {
 	}
 }
 
+func TestEscapeDetector_PendingReflectsState(t *testing.T) {
+	d := NewEscapeDetector(500 * time.Millisecond)
+
+	// Initially not pending
+	if d.Pending() {
+		t.Fatal("expected Pending() == false initially")
+	}
+
+	// After feeding Escape, should be pending
+	d.Feed(0x1B)
+	if !d.Pending() {
+		t.Fatal("expected Pending() == true after Escape")
+	}
+
+	// After feeding a non-escape byte, no longer pending
+	d.Feed('a')
+	if d.Pending() {
+		t.Fatal("expected Pending() == false after non-escape byte")
+	}
+}
+
 func TestEscapeDetector_ResetAfterDisconnect(t *testing.T) {
 	d := NewEscapeDetector(500 * time.Millisecond)
 

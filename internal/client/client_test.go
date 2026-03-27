@@ -199,6 +199,192 @@ func TestClientJoinNonexistentSession(t *testing.T) {
 	}
 }
 
+func TestClientDoneClosesAfterClose(t *testing.T) {
+	server := setupRelay(t)
+	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+
+	host := dialWS(t, server)
+	defer host.Close()
+	sendMsg(t, host, protocol.Message{
+		Type:    protocol.MsgHostRegister,
+		Session: "test-rat-done",
+	})
+
+	kxCh := startHostKeyExchange(t, host)
+
+	c, err := New(relayURL, "test-rat-done")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	result := <-kxCh
+	if result.err != nil {
+		t.Fatalf("host key exchange: %v", result.err)
+	}
+
+	// Done channel should not be closed yet
+	select {
+	case <-c.Done():
+		t.Fatal("Done channel closed before Close()")
+	default:
+	}
+
+	c.Close()
+
+	// Done channel should now be closed
+	select {
+	case <-c.Done():
+		// expected
+	case <-time.After(2 * time.Second):
+		t.Fatal("Done channel not closed after Close()")
+	}
+}
+
+func TestClientNewUnexpectedResponseType(t *testing.T) {
+	// Server sends an unexpected message type (not session_joined, not error)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upgrader := websocket.Upgrader{}
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		// Read the client_join message
+		conn.ReadMessage()
+		// Reply with an unexpected message type
+		resp, _ := json.Marshal(protocol.Message{Type: "unexpected"})
+		conn.WriteMessage(websocket.TextMessage, resp)
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	relayURL := "ws" + strings.TrimPrefix(server.URL, "http")
+
+	_, err := New(relayURL, "test-code")
+	if err == nil {
+		t.Fatal("expected error for unexpected response type")
+	}
+	if !strings.Contains(err.Error(), "unexpected relay response") {
+		t.Errorf("error = %q, want it to contain 'unexpected relay response'", err)
+	}
+}
+
+func TestClientNewInvalidJSONResponse(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upgrader := websocket.Upgrader{}
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		conn.ReadMessage()
+		// Reply with invalid JSON
+		conn.WriteMessage(websocket.TextMessage, []byte("not json"))
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	relayURL := "ws" + strings.TrimPrefix(server.URL, "http")
+
+	_, err := New(relayURL, "test-code")
+	if err == nil {
+		t.Fatal("expected error for invalid JSON response")
+	}
+	if !strings.Contains(err.Error(), "invalid relay response") {
+		t.Errorf("error = %q, want it to contain 'invalid relay response'", err)
+	}
+}
+
+func TestClientNewRelayError(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upgrader := websocket.Upgrader{}
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		conn.ReadMessage()
+		// Reply with an error message
+		resp, _ := json.Marshal(protocol.Message{
+			Type:       protocol.MsgError,
+			ErrMessage: "session not found",
+		})
+		conn.WriteMessage(websocket.TextMessage, resp)
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	relayURL := "ws" + strings.TrimPrefix(server.URL, "http")
+
+	_, err := New(relayURL, "test-code")
+	if err == nil {
+		t.Fatal("expected error from relay error response")
+	}
+	if !strings.Contains(err.Error(), "session not found") {
+		t.Errorf("error = %q, want it to contain 'session not found'", err)
+	}
+}
+
+func TestClientNewBadKeyExchangeResponse(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upgrader := websocket.Upgrader{}
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		conn.ReadMessage()
+		// Send session_joined ack
+		ack, _ := json.Marshal(protocol.Message{Type: protocol.MsgSessionJoined, Session: "test-code"})
+		conn.WriteMessage(websocket.TextMessage, ack)
+		// Read client's key_exchange
+		conn.ReadMessage()
+		// Send wrong message type instead of key_exchange
+		resp, _ := json.Marshal(protocol.Message{Type: "output", Data: "junk"})
+		conn.WriteMessage(websocket.TextMessage, resp)
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	relayURL := "ws" + strings.TrimPrefix(server.URL, "http")
+
+	_, err := New(relayURL, "test-code")
+	if err == nil {
+		t.Fatal("expected error for bad key exchange response type")
+	}
+	if !strings.Contains(err.Error(), "expected key_exchange") {
+		t.Errorf("error = %q, want it to contain 'expected key_exchange'", err)
+	}
+}
+
+func TestClientNewInvalidPeerPublicKey(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upgrader := websocket.Upgrader{}
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		conn.ReadMessage()
+		// Send session_joined ack
+		ack, _ := json.Marshal(protocol.Message{Type: protocol.MsgSessionJoined, Session: "test-code"})
+		conn.WriteMessage(websocket.TextMessage, ack)
+		// Read client's key_exchange
+		conn.ReadMessage()
+		// Send key_exchange with invalid public key (wrong length)
+		badKey := base64.StdEncoding.EncodeToString([]byte("too short"))
+		resp, _ := json.Marshal(protocol.Message{Type: protocol.MsgKeyExchange, Data: badKey})
+		conn.WriteMessage(websocket.TextMessage, resp)
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	relayURL := "ws" + strings.TrimPrefix(server.URL, "http")
+
+	_, err := New(relayURL, "test-code")
+	if err == nil {
+		t.Fatal("expected error for invalid peer public key")
+	}
+	if !strings.Contains(err.Error(), "key exchange") {
+		t.Errorf("error = %q, want it to contain 'key exchange'", err)
+	}
+}
+
 func TestClientSendsControlSequences(t *testing.T) {
 	server := setupRelay(t)
 	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"

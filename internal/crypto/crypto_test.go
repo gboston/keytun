@@ -148,6 +148,27 @@ func TestDecryptBeforeComplete(t *testing.T) {
 	}
 }
 
+func TestCompleteWithInvalidPublicKey(t *testing.T) {
+	s, err := NewSession()
+	if err != nil {
+		t.Fatalf("NewSession: %v", err)
+	}
+	// Wrong length — X25519 public keys must be exactly 32 bytes
+	err = s.Complete([]byte("too short"))
+	if err == nil {
+		t.Fatal("expected error when completing with invalid public key")
+	}
+}
+
+func TestDecryptCiphertextTooShort(t *testing.T) {
+	_, bob := completedPair(t)
+	// Nonce is 12 bytes for AES-GCM, so anything shorter should fail
+	_, err := bob.Decrypt([]byte("short"))
+	if err == nil {
+		t.Fatal("expected error when decrypting ciphertext shorter than nonce")
+	}
+}
+
 // completedPair creates two sessions that have completed key exchange.
 func completedPair(t *testing.T) (*Session, *Session) {
 	t.Helper()

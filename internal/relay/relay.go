@@ -106,14 +106,19 @@ func (r *Relay) cleanupLimiters() {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 	for range ticker.C {
-		r.limitersMu.Lock()
-		for ip, entry := range r.limiters {
-			if time.Since(entry.lastSeen) > 5*time.Minute {
-				delete(r.limiters, ip)
-			}
-		}
-		r.limitersMu.Unlock()
+		r.sweepStaleLimiters()
 	}
+}
+
+// sweepStaleLimiters removes per-IP entries that have not been used in 5 minutes.
+func (r *Relay) sweepStaleLimiters() {
+	r.limitersMu.Lock()
+	for ip, entry := range r.limiters {
+		if time.Since(entry.lastSeen) > 5*time.Minute {
+			delete(r.limiters, ip)
+		}
+	}
+	r.limitersMu.Unlock()
 }
 
 // HasSession returns true if a session with the given code exists.

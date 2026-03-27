@@ -197,8 +197,8 @@ func TestHostSendsResizeToClient(t *testing.T) {
 	defer clientConn.Close()
 	simulateClientJoinWithKeyExchange(t, clientConn, "test-owl-resize")
 
-	// Host sends resize
-	h.SendResize(120, 40)
+	// Host sends resize via UpdateTermSize (stores dims + sends)
+	h.UpdateTermSize(120, 40)
 
 	// Client should receive unencrypted resize message
 	msg := readMsg(t, clientConn)
@@ -362,6 +362,34 @@ func TestHostClientJoinedChannel(t *testing.T) {
 		// expected: closed
 	case <-time.After(2 * time.Second):
 		t.Fatal("ClientJoined channel not closed after client joined")
+	}
+}
+
+func TestHostDoneClosesAfterClose(t *testing.T) {
+	server := setupRelay(t)
+	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+
+	inj := newPTYInjector(t)
+	h, err := New(relayURL, "test-owl-done", inj)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	// Done channel should not be closed yet
+	select {
+	case <-h.Done():
+		t.Fatal("Done channel closed before Close()")
+	default:
+	}
+
+	h.Close()
+
+	// Done channel should now be closed
+	select {
+	case <-h.Done():
+		// expected
+	case <-time.After(2 * time.Second):
+		t.Fatal("Done channel not closed after Close()")
 	}
 }
 

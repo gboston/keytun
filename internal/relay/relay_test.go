@@ -489,6 +489,81 @@ func TestCheckOriginRejectedCannotDial(t *testing.T) {
 	}
 }
 
+func TestHandleWebSocketInvalidJSON(t *testing.T) {
+	server, _ := newTestServer(t)
+
+	conn := dialWS(t, server)
+	defer conn.Close()
+
+	// Send invalid JSON as the first message
+	conn.WriteMessage(websocket.TextMessage, []byte("not json"))
+
+	msg := readMsg(t, conn)
+	if msg.Type != protocol.MsgError {
+		t.Errorf("expected error for invalid JSON, got %+v", msg)
+	}
+	if msg.ErrMessage != "invalid message" {
+		t.Errorf("message = %q, want %q", msg.ErrMessage, "invalid message")
+	}
+}
+
+func TestHandleWebSocketUnknownMessageType(t *testing.T) {
+	server, _ := newTestServer(t)
+
+	conn := dialWS(t, server)
+	defer conn.Close()
+
+	sendMsg(t, conn, protocol.Message{
+		Type: "unknown_type",
+	})
+
+	msg := readMsg(t, conn)
+	if msg.Type != protocol.MsgError {
+		t.Errorf("expected error for unknown type, got %+v", msg)
+	}
+	if msg.ErrMessage != "expected host_register or client_join" {
+		t.Errorf("message = %q, want %q", msg.ErrMessage, "expected host_register or client_join")
+	}
+}
+
+func TestHandleWebSocketDisconnectBeforeFirstMessage(t *testing.T) {
+	server, _ := newTestServer(t)
+
+	conn := dialWS(t, server)
+	// Close immediately without sending anything — should not panic
+	conn.Close()
+
+	// Give the handler a moment to process
+	time.Sleep(50 * time.Millisecond)
+}
+
+func TestSweepStaleLimiters(t *testing.T) {
+	r := New()
+
+	// Create limiters via the public API (which locks internally)
+	r.getLimiter("1.2.3.4")
+	r.getLimiter("5.6.7.8")
+
+	// Backdate the stale entry
+	r.limitersMu.Lock()
+	r.limiters["1.2.3.4"].lastSeen = time.Now().Add(-10 * time.Minute)
+	r.limitersMu.Unlock()
+
+	r.sweepStaleLimiters()
+
+	r.limitersMu.Lock()
+	_, staleExists := r.limiters["1.2.3.4"]
+	_, freshExists := r.limiters["5.6.7.8"]
+	r.limitersMu.Unlock()
+
+	if staleExists {
+		t.Error("stale limiter should have been removed")
+	}
+	if !freshExists {
+		t.Error("fresh limiter should still exist")
+	}
+}
+
 func TestDuplicateSessionCode(t *testing.T) {
 	server, _ := newTestServer(t)
 

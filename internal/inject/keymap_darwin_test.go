@@ -193,9 +193,78 @@ func TestParseKeyEvents_MixedInput(t *testing.T) {
 	}
 }
 
-func TestParseKeyEvents_UnknownEscapeSequence(t *testing.T) {
-	// Unknown escape sequence should be skipped gracefully
-	events := parseKeyEvents([]byte{0x1B, '[', '9', '9', '~'})
-	// Should not panic, may produce zero events for unknown sequences
+func TestParseKeyEvents_ExtendedCSISequences(t *testing.T) {
+	tests := []struct {
+		input   []byte
+		name    string
+		keycode uint16
+	}{
+		{[]byte{0x1B, '[', '1', '~'}, "Home (CSI 1~)", kVK_Home},
+		{[]byte{0x1B, '[', '4', '~'}, "End (CSI 4~)", kVK_End},
+		{[]byte{0x1B, '[', '5', '~'}, "PageUp (CSI 5~)", kVK_PageUp},
+		{[]byte{0x1B, '[', '6', '~'}, "PageDown (CSI 6~)", kVK_PageDown},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			events := parseKeyEvents(tt.input)
+			if len(events) != 1 {
+				t.Fatalf("expected 1 event, got %d", len(events))
+			}
+			if events[0].eventType != keyEventKeycode {
+				t.Errorf("expected keycode event, got %v", events[0].eventType)
+			}
+			if events[0].keycode != tt.keycode {
+				t.Errorf("expected keycode %d, got %d", tt.keycode, events[0].keycode)
+			}
+		})
+	}
+}
+
+func TestParseKeyEvents_IncompleteCSI(t *testing.T) {
+	// ESC [ with no final byte — should produce an escape keycode
+	events := parseKeyEvents([]byte{0x1B, '['})
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(events))
+	}
+	if events[0].keycode != kVK_Escape {
+		t.Errorf("expected Escape keycode for incomplete CSI, got %d", events[0].keycode)
+	}
+}
+
+func TestParseKeyEvents_EscapeNotFollowedByBracket(t *testing.T) {
+	// ESC followed by a non-'[' character should produce escape + the char
+	events := parseKeyEvents([]byte{0x1B, 'O'})
+	if len(events) != 2 {
+		t.Fatalf("expected 2 events (escape + 'O'), got %d", len(events))
+	}
+	if events[0].keycode != kVK_Escape {
+		t.Errorf("expected Escape keycode, got %d", events[0].keycode)
+	}
+	if events[1].char != 'O' {
+		t.Errorf("expected 'O' char, got %q", events[1].char)
+	}
+}
+
+func TestParseKeyEvents_UnknownCSIWithLetterTerminator(t *testing.T) {
+	// ESC [ 9 Z — unknown CSI with a letter terminator
+	events := parseKeyEvents([]byte{0x1B, '[', '9', 'Z'})
+	// Unknown sequences should be skipped without panic
 	_ = events
+}
+
+func TestParseKeyEvents_UnknownNumericCSI(t *testing.T) {
+	// Unknown numeric CSI sequence should be skipped gracefully
+	events := parseKeyEvents([]byte{0x1B, '[', '9', '9', '~'})
+	if len(events) != 0 {
+		t.Errorf("expected 0 events for unknown numeric CSI, got %d", len(events))
+	}
+}
+
+func TestParseKeyEvents_HighByteSkipped(t *testing.T) {
+	// Bytes > 0x7E should be skipped
+	events := parseKeyEvents([]byte{0x80, 0xFF})
+	if len(events) != 0 {
+		t.Errorf("expected 0 events for high bytes, got %d", len(events))
+	}
 }

@@ -17,7 +17,7 @@
   <a href="https://keytun.com">Website</a>
 </p>
 
-<p align="center"><img src="https://img.shields.io/github/v/release/gboston/keytun" alt="Latest release" /> <img src="https://img.shields.io/github/downloads/gboston/keytun/total?label=downloads" alt="Total downloads" /> <img src="https://img.shields.io/github/actions/workflow/status/gboston/keytun/release.yml?label=build" alt="Build status" /> <img src="https://img.shields.io/github/license/gboston/keytun" alt="License" /> <img src="https://img.shields.io/github/go-mod/go-version/gboston/keytun" alt="Go version" /></p>
+<p align="center"><img src="https://img.shields.io/github/v/release/gboston/keytun" alt="Latest release" /> <img src="https://img.shields.io/github/downloads/gboston/keytun/total?label=downloads" alt="Total downloads" /> <img src="https://img.shields.io/github/actions/workflow/status/gboston/keytun/ci.yml?label=tests" alt="Tests status" /> <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/gboston/89173ff076f30c19d0115c49139c6654/raw/keytun-coverage.json" alt="Coverage" /> <img src="https://img.shields.io/github/license/gboston/keytun" alt="License" /> <img src="https://img.shields.io/github/go-mod/go-version/gboston/keytun" alt="Go version" /></p>
 
 ---
 
