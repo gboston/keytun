@@ -7,6 +7,7 @@
 	<div class="nav-inner">
 		<a href="/" class="logo">
 			<img src="/favicon.svg" alt="keytun logo" class="logo-icon" width="36" height="36" /> keytun
+			<span class="alpha-badge">alpha</span>
 		</a>
 		<div class="nav-links">
 			<a href="/#how-it-works">How it works</a>
@@ -57,6 +58,19 @@
 
 	.logo:hover {
 		color: var(--text);
+	}
+
+	.alpha-badge {
+		font-size: 0.6rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: var(--accent-coral);
+		background: var(--badge-bg);
+		border: 1px solid var(--badge-border);
+		padding: 2px 8px;
+		border-radius: 50px;
+		line-height: 1;
 	}
 
 	.logo-icon {
