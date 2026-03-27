@@ -41,9 +41,7 @@ import Nav from '../../components/Nav.astro';
 	</main>
 
 	<script>
-		import { Terminal } from '@xterm/xterm';
-		import { FitAddon } from '@xterm/addon-fit';
-		import '@xterm/xterm/css/xterm.css';
+		import { init, Terminal } from 'ghostty-web';
 		import { KeytunClient, EscapeDetector } from '../../scripts/keytun-client.js';
 
 		const RELAY_URL = 'wss://relay.keytun.com/ws';
@@ -101,9 +99,12 @@ import Nav from '../../components/Nav.astro';
 				return;
 			}
 
+			// Initialize ghostty-web WASM module
+			await init();
+
 			terminalTitle.textContent = `keytun — ${sessionCode}`;
 
-			// Set up xterm.js
+			// Set up ghostty-web terminal
 			const term = new Terminal({
 				cursorBlink: true,
 				fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace",
@@ -115,9 +116,6 @@ import Nav from '../../components/Nav.astro';
 					selectionBackground: 'rgba(139, 108, 224, 0.3)',
 				},
 			});
-
-			const fitAddon = new FitAddon();
-			term.loadAddon(fitAddon);
 
 			// Connect to relay
 			showStatus(`Connecting to session ${sessionCode}...`);
@@ -145,11 +143,7 @@ import Nav from '../../components/Nav.astro';
 			// Connection established — show terminal
 			showTerminal();
 			term.open(terminalContainer);
-			fitAddon.fit();
 			term.focus();
-
-			// Terminal dimensions are dictated by the host via resize messages,
-			// so we don't auto-fit on browser window resize.
 
 			// Wire output: relay -> terminal
 			client.onOutput = (data: Uint8Array) => {
