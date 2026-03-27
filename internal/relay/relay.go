@@ -5,16 +5,50 @@ package relay
 import (
 	"encoding/json"
 	"log"
+	"net"
 	"net/http"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/gboston/keytun/internal/protocol"
 	"github.com/gorilla/websocket"
+	"golang.org/x/time/rate"
 )
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
+// realIP returns the client's IP address. It prefers the CF-Connecting-IP
+// header set by Cloudflare, then falls back to the TCP remote address.
+func realIP(r *http.Request) string {
+	if ip := r.Header.Get("CF-Connecting-IP"); ip != "" {
+		return ip
+	}
+	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if ip == "" {
+		return r.RemoteAddr
+	}
+	return ip
 }
+
+// checkOrigin allows CLI clients (no Origin header) and browser connections
+// from keytun.com or localhost. Rejects all other browser origins.
+func checkOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+	if strings.HasPrefix(origin, "http://localhost") || strings.HasPrefix(origin, "http://127.0.0.1") {
+		return true
+	}
+	allowed := []string{"https://keytun.com", "https://www.keytun.com"}
+	for _, o := range allowed {
+		if origin == o {
+			return true
+		}
+	}
+	return false
+}
+
+var upgrader = websocket.Upgrader{CheckOrigin: checkOrigin}
 
 // session holds the state for a single keytun session.
 type session struct {
@@ -23,16 +57,62 @@ type session struct {
 	mu     sync.Mutex
 }
 
-// Relay is the WebSocket broker that manages sessions.
-type Relay struct {
-	sessions map[string]*session
-	mu       sync.Mutex
+// ipEntry tracks a per-IP rate limiter and when it was last used.
+type ipEntry struct {
+	limiter  *rate.Limiter
+	lastSeen time.Time
 }
 
-// New creates a new Relay.
+// Relay is the WebSocket broker that manages sessions.
+type Relay struct {
+	sessions   map[string]*session
+	mu         sync.Mutex
+	limiters   map[string]*ipEntry
+	limitersMu sync.Mutex
+	// joinBurst controls how many join attempts an IP may make before being
+	// rate limited. Defaults to 10 (one per 6 seconds steady-state).
+	joinBurst int
+}
+
+// New creates a new Relay and starts background cleanup of stale rate limiters.
 func New() *Relay {
-	return &Relay{
-		sessions: make(map[string]*session),
+	r := &Relay{
+		sessions:  make(map[string]*session),
+		limiters:  make(map[string]*ipEntry),
+		joinBurst: 10,
+	}
+	go r.cleanupLimiters()
+	return r
+}
+
+// getLimiter returns the rate limiter for the given IP, creating one if needed.
+// Each IP may make joinBurst join attempts upfront, then one every 6 seconds.
+func (r *Relay) getLimiter(ip string) *rate.Limiter {
+	r.limitersMu.Lock()
+	defer r.limitersMu.Unlock()
+	entry, ok := r.limiters[ip]
+	if !ok {
+		entry = &ipEntry{
+			limiter: rate.NewLimiter(rate.Every(6*time.Second), r.joinBurst),
+		}
+		r.limiters[ip] = entry
+	}
+	entry.lastSeen = time.Now()
+	return entry.limiter
+}
+
+// cleanupLimiters removes per-IP entries that have not been used in 5 minutes.
+func (r *Relay) cleanupLimiters() {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		r.limitersMu.Lock()
+		for ip, entry := range r.limiters {
+			if time.Since(entry.lastSeen) > 5*time.Minute {
+				delete(r.limiters, ip)
+			}
+		}
+		r.limitersMu.Unlock()
 	}
 }
 
@@ -46,6 +126,9 @@ func (r *Relay) HasSession(code string) bool {
 
 // HandleWebSocket is the HTTP handler for the /ws endpoint.
 func (r *Relay) HandleWebSocket(w http.ResponseWriter, req *http.Request) {
+	// Capture the real client IP before the HTTP request is consumed by upgrade.
+	ip := realIP(req)
+
 	conn, err := upgrader.Upgrade(w, req, nil)
 	if err != nil {
 		log.Printf("upgrade: %v", err)
@@ -70,7 +153,7 @@ func (r *Relay) HandleWebSocket(w http.ResponseWriter, req *http.Request) {
 	case protocol.MsgHostRegister:
 		r.handleHost(conn, msg.Session)
 	case protocol.MsgClientJoin:
-		r.handleClient(conn, msg.Session)
+		r.handleClient(conn, msg.Session, ip)
 	default:
 		sendError(conn, "expected host_register or client_join")
 		conn.Close()
@@ -129,7 +212,13 @@ func (r *Relay) handleHost(conn *websocket.Conn, code string) {
 	}
 }
 
-func (r *Relay) handleClient(conn *websocket.Conn, code string) {
+func (r *Relay) handleClient(conn *websocket.Conn, code string, ip string) {
+	if !r.getLimiter(ip).Allow() {
+		sendError(conn, "too many requests")
+		conn.Close()
+		return
+	}
+
 	r.mu.Lock()
 	sess, exists := r.sessions[code]
 	r.mu.Unlock()

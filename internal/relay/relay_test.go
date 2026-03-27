@@ -333,6 +333,162 @@ func TestResizeFlowsFromHostToClient(t *testing.T) {
 	}
 }
 
+func TestCheckOrigin(t *testing.T) {
+	cases := []struct {
+		origin  string
+		allowed bool
+	}{
+		{"", true},
+		{"https://keytun.com", true},
+		{"https://www.keytun.com", true},
+		{"http://localhost", true},
+		{"http://localhost:3000", true},
+		{"http://127.0.0.1:8080", true},
+		{"https://evil.com", false},
+		{"https://notkeytun.com", false},
+		{"https://fakeytun.com", false},
+	}
+
+	for _, tc := range cases {
+		req, _ := http.NewRequest("GET", "/ws", nil)
+		if tc.origin != "" {
+			req.Header.Set("Origin", tc.origin)
+		}
+		got := checkOrigin(req)
+		if got != tc.allowed {
+			t.Errorf("checkOrigin(%q) = %v, want %v", tc.origin, got, tc.allowed)
+		}
+	}
+}
+
+func TestRealIPPrefersCFConnectingIP(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/ws", nil)
+	req.RemoteAddr = "1.2.3.4:5678"
+	req.Header.Set("CF-Connecting-IP", "9.9.9.9")
+	if got := realIP(req); got != "9.9.9.9" {
+		t.Errorf("realIP = %q, want %q", got, "9.9.9.9")
+	}
+}
+
+func TestRealIPFallsBackToRemoteAddr(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/ws", nil)
+	req.RemoteAddr = "1.2.3.4:5678"
+	if got := realIP(req); got != "1.2.3.4" {
+		t.Errorf("realIP = %q, want %q", got, "1.2.3.4")
+	}
+}
+
+func TestRateLimitBlocksExcessiveJoinAttempts(t *testing.T) {
+	r := New()
+	r.joinBurst = 2 // low burst to test without 10+ connections
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", r.HandleWebSocket)
+	server := httptest.NewServer(mux)
+	t.Cleanup(func() { server.Close() })
+
+	// Register a host so joins can succeed (avoids "session not found" for first attempts)
+	host := dialWS(t, server)
+	defer host.Close()
+	sendMsg(t, host, protocol.Message{Type: protocol.MsgHostRegister, Session: "rate-test-01"})
+
+	// Exhaust the burst allowance
+	for i := 0; i < r.joinBurst; i++ {
+		conn := dialWS(t, server)
+		sendMsg(t, conn, protocol.Message{Type: protocol.MsgClientJoin, Session: "rate-test-01"})
+		conn.Close()
+	}
+
+	// Next attempt should be rate limited
+	conn := dialWS(t, server)
+	defer conn.Close()
+	sendMsg(t, conn, protocol.Message{Type: protocol.MsgClientJoin, Session: "rate-test-01"})
+	msg := readMsg(t, conn)
+	if msg.Type != protocol.MsgError || msg.ErrMessage != "too many requests" {
+		t.Errorf("expected rate limit error, got %+v", msg)
+	}
+}
+
+func dialWSWithHeader(t *testing.T, server *httptest.Server, header http.Header) *websocket.Conn {
+	t.Helper()
+	url := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+	conn, _, err := websocket.DefaultDialer.Dial(url, header)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	return conn
+}
+
+func TestRateLimitUsesCFConnectingIP(t *testing.T) {
+	r := New()
+	r.joinBurst = 2
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", r.HandleWebSocket)
+	server := httptest.NewServer(mux)
+	t.Cleanup(func() { server.Close() })
+
+	host := dialWS(t, server)
+	defer host.Close()
+	sendMsg(t, host, protocol.Message{Type: protocol.MsgHostRegister, Session: "cf-rate-test"})
+
+	// Exhaust burst for a specific CF IP
+	cfHeader := http.Header{"CF-Connecting-IP": []string{"5.6.7.8"}}
+	for i := 0; i < r.joinBurst; i++ {
+		conn := dialWSWithHeader(t, server, cfHeader)
+		sendMsg(t, conn, protocol.Message{Type: protocol.MsgClientJoin, Session: "cf-rate-test"})
+		conn.Close()
+	}
+
+	// Same CF IP should now be rate limited
+	conn := dialWSWithHeader(t, server, cfHeader)
+	defer conn.Close()
+	sendMsg(t, conn, protocol.Message{Type: protocol.MsgClientJoin, Session: "cf-rate-test"})
+	msg := readMsg(t, conn)
+	if msg.Type != protocol.MsgError || msg.ErrMessage != "too many requests" {
+		t.Errorf("expected rate limit error for CF IP, got %+v", msg)
+	}
+
+	// A different CF IP should still be allowed
+	otherHeader := http.Header{"CF-Connecting-IP": []string{"9.9.9.9"}}
+	conn2 := dialWSWithHeader(t, server, otherHeader)
+	defer conn2.Close()
+	sendMsg(t, conn2, protocol.Message{Type: protocol.MsgClientJoin, Session: "cf-rate-test"})
+	msg2 := readMsg(t, conn2)
+	if msg2.Type == protocol.MsgError && msg2.ErrMessage == "too many requests" {
+		t.Error("different CF IP should not be rate limited")
+	}
+}
+
+func TestRateLimitGetLimiterSameIPReturnsSameLimiter(t *testing.T) {
+	r := New()
+	l1 := r.getLimiter("10.0.0.1")
+	l2 := r.getLimiter("10.0.0.1")
+	if l1 != l2 {
+		t.Error("expected same limiter for same IP")
+	}
+}
+
+func TestRateLimitGetLimiterDifferentIPsReturnDifferentLimiters(t *testing.T) {
+	r := New()
+	l1 := r.getLimiter("10.0.0.1")
+	l2 := r.getLimiter("10.0.0.2")
+	if l1 == l2 {
+		t.Error("expected different limiters for different IPs")
+	}
+}
+
+func TestCheckOriginRejectedCannotDial(t *testing.T) {
+	server, _ := newTestServer(t)
+	url := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+	header := http.Header{"Origin": []string{"https://evil.com"}}
+	_, resp, err := websocket.DefaultDialer.Dial(url, header)
+	if err == nil {
+		t.Fatal("expected dial to fail for disallowed origin, but it succeeded")
+	}
+	if resp == nil || resp.StatusCode != http.StatusForbidden {
+		t.Errorf("expected 403 Forbidden, got: %v", resp)
+	}
+}
+
 func TestDuplicateSessionCode(t *testing.T) {
 	server, _ := newTestServer(t)
 
