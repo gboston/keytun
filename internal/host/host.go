@@ -20,6 +20,7 @@ import (
 type Host struct {
 	sessionCode   string
 	conn          *websocket.Conn
+	connMu        sync.Mutex
 	injector      inject.Injector
 	localOut      io.Writer
 	outputBuf     strings.Builder
@@ -97,7 +98,15 @@ func (h *Host) SendResize(cols, rows uint16) {
 		Rows: rows,
 	}
 	data, _ := json.Marshal(msg)
-	h.conn.WriteMessage(websocket.TextMessage, data)
+	h.writeMessage(websocket.TextMessage, data)
+}
+
+// writeMessage serializes writes to the WebSocket connection, which does not
+// allow concurrent writers.
+func (h *Host) writeMessage(msgType int, data []byte) error {
+	h.connMu.Lock()
+	defer h.connMu.Unlock()
+	return h.conn.WriteMessage(msgType, data)
 }
 
 // Close shuts down the host session.
@@ -147,7 +156,7 @@ func (h *Host) sendEncryptedOutput(data []byte) {
 		Data: encoded,
 	}
 	msgData, _ := json.Marshal(msg)
-	h.conn.WriteMessage(websocket.TextMessage, msgData)
+	h.writeMessage(websocket.TextMessage, msgData)
 }
 
 // readOutput reads from an OutputReader and forwards output to the relay and buffer.
@@ -196,7 +205,7 @@ func (h *Host) readOutput(or inject.OutputReader) {
 			Data: encoded,
 		}
 		data, _ := json.Marshal(msg)
-		h.conn.WriteMessage(websocket.TextMessage, data)
+		h.writeMessage(websocket.TextMessage, data)
 	}
 }
 
@@ -269,7 +278,7 @@ func (h *Host) readRelayMessages() {
 					Data: pubEncoded,
 				}
 				kxData, _ := json.Marshal(kxMsg)
-				h.conn.WriteMessage(websocket.TextMessage, kxData)
+				h.writeMessage(websocket.TextMessage, kxData)
 
 				// Send current terminal dimensions so the client can match
 				if h.termCols > 0 && h.termRows > 0 {
