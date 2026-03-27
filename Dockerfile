@@ -1,7 +1,7 @@
 # ABOUTME: Multi-stage Dockerfile for the keytun relay server.
 # ABOUTME: Builds the Go binary and runs it in a minimal distroless container.
 
-FROM --platform=linux/amd64 golang:1.25-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 COPY go.mod go.sum ./
