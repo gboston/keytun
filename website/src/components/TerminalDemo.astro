@@ -154,6 +154,17 @@
 	@media (max-width: 768px) {
 		.terminal-wrap {
 			grid-template-columns: 1fr;
+			gap: 16px;
+		}
+	}
+
+	@media (max-width: 480px) {
+		.terminal-wrap {
+			margin: 0 -16px;
+		}
+
+		.terminal {
+			border-radius: 0;
 		}
 	}
 </style>
