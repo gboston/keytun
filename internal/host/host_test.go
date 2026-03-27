@@ -332,6 +332,39 @@ func TestHostEchosInputWhenNoOutput(t *testing.T) {
 	}
 }
 
+func TestHostClientJoinedChannel(t *testing.T) {
+	server := setupRelay(t)
+	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+
+	inj := newPTYInjector(t)
+	h, err := New(relayURL, "test-joined-01", inj)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer h.Close()
+
+	// Before client joins, channel should not be closed
+	select {
+	case <-h.ClientJoined():
+		t.Fatal("ClientJoined channel closed before client joined")
+	default:
+		// expected: not yet closed
+	}
+
+	// Simulate client joining with key exchange
+	clientConn := dialWS(t, server)
+	defer clientConn.Close()
+	simulateClientJoinWithKeyExchange(t, clientConn, "test-joined-01")
+
+	// After client joins, channel should be closed
+	select {
+	case <-h.ClientJoined():
+		// expected: closed
+	case <-time.After(2 * time.Second):
+		t.Fatal("ClientJoined channel not closed after client joined")
+	}
+}
+
 func TestHostSendsBannerWhenNoOutput(t *testing.T) {
 	server := setupRelay(t)
 	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"

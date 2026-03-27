@@ -18,18 +18,20 @@ import (
 
 // Host manages a keytun hosting session.
 type Host struct {
-	sessionCode   string
-	conn          *websocket.Conn
-	connMu        sync.Mutex
-	injector      inject.Injector
-	localOut      io.Writer
-	outputBuf     strings.Builder
-	outputMu      sync.Mutex
-	cryptoSession *crypto.Session
-	keyReady      chan struct{}
-	done          chan struct{}
-	termCols      uint16
-	termRows      uint16
+	sessionCode      string
+	conn             *websocket.Conn
+	connMu           sync.Mutex
+	injector         inject.Injector
+	localOut         io.Writer
+	outputBuf        strings.Builder
+	outputMu         sync.Mutex
+	cryptoSession    *crypto.Session
+	keyReady         chan struct{}
+	done             chan struct{}
+	clientJoined     chan struct{}
+	clientJoinedOnce sync.Once
+	termCols         uint16
+	termRows         uint16
 }
 
 // New creates a new Host that connects to the relay and uses the given injector.
@@ -57,12 +59,13 @@ func New(relayURL string, sessionCode string, injector inject.Injector, localOut
 	}
 
 	h := &Host{
-		sessionCode: sessionCode,
-		conn:        conn,
-		injector:    injector,
-		localOut:    out,
-		keyReady:    make(chan struct{}),
-		done:        make(chan struct{}),
+		sessionCode:  sessionCode,
+		conn:         conn,
+		injector:     injector,
+		localOut:     out,
+		keyReady:     make(chan struct{}),
+		done:         make(chan struct{}),
+		clientJoined: make(chan struct{}),
 	}
 
 	// Only read output if the injector produces it (e.g. PTY mode)
@@ -124,6 +127,11 @@ func (h *Host) Close() {
 // Done returns a channel that is closed when the host session ends.
 func (h *Host) Done() <-chan struct{} {
 	return h.done
+}
+
+// ClientJoined returns a channel that is closed when a client connects.
+func (h *Host) ClientJoined() <-chan struct{} {
+	return h.clientJoined
 }
 
 // ReadOutputUntil reads buffered output until it contains the target
@@ -265,6 +273,7 @@ func (h *Host) readRelayMessages() {
 		case protocol.MsgPeerEvent:
 			var banner string
 			if msg.Event == "joined" {
+				h.clientJoinedOnce.Do(func() { close(h.clientJoined) })
 				banner = "\r\n[keytun] client connected\r\n"
 				// Start key exchange: create session and send our public key
 				sess, err := crypto.NewSession()

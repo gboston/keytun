@@ -4,7 +4,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"os/signal"
 	"syscall"
@@ -43,6 +42,7 @@ func runTerminalMode(code string) error {
 	fmt.Printf("Session: %s\n", code)
 	fmt.Printf("Join:    https://keytun.com/s/%s\n", code)
 	fmt.Println("Waiting for client... (share the link with your colleague)")
+	fmt.Println("Press Ctrl+C to cancel.")
 	fmt.Println()
 
 	inj, err := inject.NewPTY()
@@ -81,8 +81,29 @@ func runTerminalMode(code string) error {
 	}
 	defer term.Restore(int(os.Stdin.Fd()), oldState)
 
-	// Copy local stdin to PTY — blocks until stdin closes or PTY dies
-	io.Copy(inj.PTY(), os.Stdin)
+	// Copy local stdin to PTY. Before a client joins, Ctrl+C (0x03) exits
+	// keytun cleanly instead of passing through to the PTY shell.
+	buf := make([]byte, 256)
+	for {
+		n, err := os.Stdin.Read(buf)
+		if err != nil || n == 0 {
+			break
+		}
+		select {
+		case <-h.ClientJoined():
+			// client connected — pass all bytes through normally
+		default:
+			// no client yet — check for Ctrl+C
+			for i := 0; i < n; i++ {
+				if buf[i] == 0x03 {
+					return nil
+				}
+			}
+		}
+		if _, err := inj.PTY().Write(buf[:n]); err != nil {
+			break
+		}
+	}
 
 	return nil
 }
