@@ -58,6 +58,16 @@ import TerminalDemo from './TerminalDemo.astro';
 		padding: 6px 18px;
 		border-radius: 50px;
 		margin-bottom: 28px;
+		position: relative;
+		z-index: 1;
+	}
+
+	:global([data-theme="dark"]) .hero-badge {
+		box-shadow: 0 0 16px rgba(255, 79, 56, 0.18), 0 0 0 1px rgba(255, 79, 56, 0.08) inset;
+	}
+
+	:global([data-theme="dark"]) .hero-glow {
+		background: radial-gradient(ellipse at 50% 30%, rgba(255, 79, 56, 0.20) 0%, rgba(255, 186, 48, 0.10) 45%, transparent 70%);
 	}
 
 	.hero h1 {
@@ -91,7 +101,7 @@ import TerminalDemo from './TerminalDemo.astro';
 		gap: 16px;
 		justify-content: center;
 		flex-wrap: wrap;
-		margin-bottom: 64px;
+		margin-bottom: 40px;
 	}
 
 	@media (max-width: 768px) {
@@ -104,7 +114,7 @@ import TerminalDemo from './TerminalDemo.astro';
 		opacity: 0;
 		transform: translateY(20px);
 		animation: hero-fade-in 0.6s ease-out forwards;
-		animation-delay: calc(var(--delay) * 0.12s + 0.1s);
+		animation-delay: calc(var(--delay) * 0.15s + 0.1s);
 	}
 
 	@keyframes hero-fade-in {

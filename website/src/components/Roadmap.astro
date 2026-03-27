@@ -1,126 +1,285 @@
 ---
 // ABOUTME: Roadmap section showing planned features for keytun.
-// ABOUTME: Displays upcoming features as cards with keycap icons and status badges.
+// ABOUTME: Two-tier layout: prominent "up next" cards + compact numbered list for planned items.
 ---
 
 <section class="section section-dark" id="roadmap">
 	<div class="container">
 		<h2>Roadmap</h2>
 		<p class="section-sub">What's coming next.</p>
-		<div class="roadmap-grid">
-			<div class="roadmap-card">
-				<div class="keycap-small roadmap-icon">🔐</div>
-				<h3>Password-protected sessions</h3>
-				<p>Host sets a password when starting a session. Clients must enter it before keystrokes flow.</p>
-			</div>
-			<div class="roadmap-card">
-				<div class="keycap-small roadmap-icon">👁</div>
-				<h3>Read-only mode</h3>
-				<p>Join as a viewer — see the terminal output without being able to type. Great for demos and teaching.</p>
-			</div>
-			<div class="roadmap-card">
-				<div class="keycap-small roadmap-icon">🐧</div>
-				<h3>Linux system mode</h3>
-				<p>OS-level keystroke injection on Linux via xdotool/ydotool, matching the existing macOS system mode.</p>
-			</div>
-			<div class="roadmap-card">
-				<div class="keycap-small roadmap-icon">🔔</div>
-				<h3>Connection notifications</h3>
-				<p>Audible and visual notifications when a client joins or leaves your session.</p>
-			</div>
-			<div class="roadmap-card">
-				<div class="keycap-small roadmap-icon">📡</div>
-				<h3>Latency indicator</h3>
-				<p>Round-trip time in the client status bar so you know whether lag is keytun or your connection.</p>
-			</div>
-			<div class="roadmap-card">
-				<div class="keycap-small roadmap-icon">✋</div>
+
+		<!-- Up next: prominent featured cards -->
+		<div class="upnext-header">
+			<span class="upnext-dot"></span>
+			<span class="upnext-label">Up next</span>
+		</div>
+		<div class="upnext-grid">
+			<div class="upnext-card">
+				<div class="upnext-top">
+					<span class="upnext-icon" aria-hidden="true">✋</span>
+					<span class="item-tag tag-security">security</span>
+				</div>
 				<h3>Connection approval</h3>
 				<p>Host approves each client before keystrokes start flowing. Full control over who gets access.</p>
 			</div>
+			<div class="upnext-card">
+				<div class="upnext-top">
+					<span class="upnext-icon" aria-hidden="true">🔐</span>
+					<span class="item-tag tag-security">security</span>
+				</div>
+				<h3>Password-protected sessions</h3>
+				<p>Host sets a password when starting a session. Clients must enter it before keystrokes flow.</p>
+			</div>
 		</div>
+
+		<!-- Planned: compact numbered list -->
+		<div class="planned-header">
+			<span class="planned-dot"></span>
+			<span class="planned-label">Planned</span>
+		</div>
+		<ol class="planned-list">
+			<li class="planned-item">
+				<span class="planned-icon" aria-hidden="true">👁</span>
+				<div class="planned-content">
+					<span class="planned-title">Read-only mode</span>
+					<span class="planned-desc">Join as a viewer — see terminal output without being able to type.</span>
+				</div>
+				<span class="item-tag tag-feature">feature</span>
+			</li>
+			<li class="planned-item">
+				<span class="planned-icon" aria-hidden="true">🐧</span>
+				<div class="planned-content">
+					<span class="planned-title">Linux system mode</span>
+					<span class="planned-desc">OS-level keystroke injection via xdotool/ydotool, matching macOS system mode.</span>
+				</div>
+				<span class="item-tag tag-platform">platform</span>
+			</li>
+			<li class="planned-item">
+				<span class="planned-icon" aria-hidden="true">📡</span>
+				<div class="planned-content">
+					<span class="planned-title">Latency indicator</span>
+					<span class="planned-desc">Round-trip time in the client status bar so you know whether lag is keytun or your connection.</span>
+				</div>
+				<span class="item-tag tag-ux">ux</span>
+			</li>
+			<li class="planned-item">
+				<span class="planned-icon" aria-hidden="true">🔔</span>
+				<div class="planned-content">
+					<span class="planned-title">Connection notifications</span>
+					<span class="planned-desc">Audible and visual notifications when a client joins or leaves your session.</span>
+				</div>
+				<span class="item-tag tag-ux">ux</span>
+			</li>
+		</ol>
 	</div>
 </section>
 
 <style>
-	.roadmap-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
-		gap: 20px;
-		margin-top: 48px;
+	/* ---- Up next ---- */
+	.upnext-header {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		margin-bottom: 20px;
 	}
 
-	.roadmap-card {
+	.upnext-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: var(--accent-peach);
+		box-shadow: 0 0 8px rgba(255, 126, 82, 0.7);
+		flex-shrink: 0;
+	}
+
+	.upnext-label {
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--accent-peach);
+	}
+
+	.upnext-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 16px;
+		margin-bottom: 48px;
+	}
+
+	.upnext-card {
 		background: var(--bg-card);
-		border: 1px solid var(--border);
+		border: 1px solid rgba(255, 126, 82, 0.2);
 		border-radius: var(--radius);
 		padding: 28px 24px;
 		display: flex;
 		flex-direction: column;
-		transition: border-color 0.25s, box-shadow 0.25s, transform 0.25s;
+		gap: 12px;
+		transition: border-color 0.2s, transform 0.2s;
 	}
 
-	.roadmap-card:hover {
-		border-color: var(--border-accent);
-		box-shadow: 0 0 0 1px rgba(255, 79, 56, 0.08), 0 12px 40px rgba(0,0,0,0.3), 0 0 28px rgba(255, 79, 56, 0.07);
-		transform: translateY(-3px);
+	[data-theme="dark"] .upnext-card {
+		background: linear-gradient(135deg, var(--bg-card) 60%, rgba(255, 126, 82, 0.04));
+		border-color: rgba(255, 126, 82, 0.22);
+		box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.4);
 	}
 
-	.roadmap-icon {
+	.upnext-card:hover {
+		border-color: rgba(255, 126, 82, 0.4);
+		transform: translateY(-2px);
+	}
+
+	.upnext-top {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.upnext-icon {
+		font-size: 1.4rem;
+	}
+
+	.upnext-card h3 {
+		font-size: 1.05rem;
+		font-weight: 600;
+		line-height: 1.3;
+		margin: 0;
+	}
+
+	.upnext-card p {
+		color: var(--text-dim);
+		font-size: 0.88rem;
+		line-height: 1.6;
+		margin: 0;
+	}
+
+	/* ---- Planned ---- */
+	.planned-header {
+		display: flex;
+		align-items: center;
+		gap: 10px;
 		margin-bottom: 16px;
 	}
 
-	.roadmap-badge {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
+	.planned-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: var(--text-muted);
+		flex-shrink: 0;
+	}
+
+	.planned-label {
 		font-family: var(--font-mono);
-		font-size: 0.7rem;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		padding: 3px 10px;
-		border-radius: 50px;
-		width: fit-content;
-		margin-bottom: 12px;
-	}
-
-	.roadmap-badge.planned {
-		color: var(--accent-amber);
-		background: rgba(232, 168, 48, 0.1);
-		border: 1px solid rgba(232, 168, 48, 0.2);
-	}
-
-	[data-theme="dark"] .roadmap-badge.planned {
-		background: rgba(255, 217, 61, 0.1);
-		border-color: rgba(255, 217, 61, 0.2);
-	}
-
-	.roadmap-badge.in-progress {
-		color: var(--accent-mint);
-		background: rgba(61, 168, 84, 0.1);
-		border: 1px solid rgba(61, 168, 84, 0.2);
-	}
-
-	[data-theme="dark"] .roadmap-badge.in-progress {
-		background: rgba(107, 203, 119, 0.1);
-		border-color: rgba(107, 203, 119, 0.2);
-	}
-
-	.roadmap-card h3 {
-		font-size: 1.05rem;
+		font-size: 0.72rem;
 		font-weight: 600;
-		margin-bottom: 8px;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--text-muted);
 	}
 
-	.roadmap-card p {
-		color: var(--text-dim);
+	.planned-list {
+		list-style: none;
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		overflow: hidden;
+		background: var(--bg-card);
+	}
+
+	[data-theme="dark"] .planned-list {
+		box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.4);
+	}
+
+	.planned-item {
+		display: flex;
+		align-items: center;
+		gap: 16px;
+		padding: 16px 20px;
+		border-bottom: 1px solid var(--border);
+		transition: background 0.15s;
+	}
+
+	.planned-item:last-child {
+		border-bottom: none;
+	}
+
+	.planned-item:hover {
+		background: var(--bg-elevated);
+	}
+
+	.planned-icon {
+		font-size: 1rem;
+		flex-shrink: 0;
+		width: 24px;
+		text-align: center;
+	}
+
+	.planned-content {
+		flex: 1;
+		display: flex;
+		align-items: baseline;
+		gap: 12px;
+		min-width: 0;
+	}
+
+	.planned-title {
 		font-size: 0.92rem;
-		line-height: 1.6;
+		font-weight: 600;
+		white-space: nowrap;
 	}
 
-	@media (max-width: 768px) {
-		.roadmap-grid {
+	.planned-desc {
+		font-size: 0.83rem;
+		color: var(--text-muted);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/* ---- Tags ---- */
+	.item-tag {
+		font-family: var(--font-mono);
+		font-size: 0.62rem;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		padding: 2px 7px;
+		border-radius: 4px;
+		flex-shrink: 0;
+	}
+
+	.tag-security {
+		color: var(--accent-amber);
+		background: rgba(255, 186, 48, 0.08);
+		border: 1px solid rgba(255, 186, 48, 0.2);
+	}
+
+	.tag-feature {
+		color: var(--accent-lavender);
+		background: rgba(176, 140, 255, 0.08);
+		border: 1px solid rgba(176, 140, 255, 0.2);
+	}
+
+	.tag-platform {
+		color: var(--accent-sky);
+		background: rgba(62, 201, 245, 0.08);
+		border: 1px solid rgba(62, 201, 245, 0.2);
+	}
+
+	.tag-ux {
+		color: var(--accent-mint);
+		background: rgba(77, 222, 122, 0.08);
+		border: 1px solid rgba(77, 222, 122, 0.2);
+	}
+
+	@media (max-width: 600px) {
+		.upnext-grid {
 			grid-template-columns: 1fr;
+		}
+
+		.planned-desc {
+			display: none;
 		}
 	}
 </style>

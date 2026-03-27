@@ -71,10 +71,11 @@ const { title, description = "Lightweight keyboard tunnel for pair programming o
 		<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 	</head>
 	<body>
+		<a href="#main-content" class="skip-link">Skip to main content</a>
 		<slot />
 
 		<!-- Analytics consent banner -->
-		<div id="consent-banner" class="consent-banner" style="display:none;">
+		<div id="consent-banner" class="consent-banner" role="dialog" aria-label="Cookie consent" style="display:none;">
 			<p>We use analytics cookies to understand how you use our site.</p>
 			<div class="consent-actions">
 				<button id="consent-accept" class="consent-btn consent-btn-accept">Accept</button>
@@ -163,7 +164,9 @@ const { title, description = "Lightweight keyboard tunnel for pair programming o
 		--font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 		--font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
 		--font-display: 'Syne', var(--font-sans);
-		--bg-texture: none;
+		--bg-texture:
+			repeating-linear-gradient(0deg, transparent 0, transparent 47px, rgba(0,0,0,0.05) 47px, rgba(0,0,0,0.05) 48px),
+			repeating-linear-gradient(90deg, transparent 0, transparent 47px, rgba(0,0,0,0.05) 47px, rgba(0,0,0,0.05) 48px);
 
 		/* Light theme (default) */
 		--bg: #ffffff;
@@ -173,13 +176,15 @@ const { title, description = "Lightweight keyboard tunnel for pair programming o
 
 		--text: #1d1d1f;
 		--text-dim: #6e6e73;
-		--text-muted: #a1a1a6;
+		--text-muted: #86868b;
 
 		--border: rgba(0, 0, 0, 0.08);
 		--border-accent: rgba(232, 84, 78, 0.25);
 
 		--keycap-shadow: 0 3px 0 #d1d1d6, 0 5px 10px rgba(0,0,0,0.08);
 		--keycap-shadow-sm: 0 2px 0 #d1d1d6, 0 3px 6px rgba(0,0,0,0.06);
+		--keycap-shadow-pressed: 0 1px 0 #d1d1d6, 0 1px 3px rgba(0,0,0,0.05);
+		--keycap-shadow-sm-pressed: 0 0px 0 #d1d1d6, 0 1px 2px rgba(0,0,0,0.04);
 
 		--terminal-bg: #1d1d1f;
 		--terminal-bar: #2c2c2e;
@@ -219,7 +224,7 @@ const { title, description = "Lightweight keyboard tunnel for pair programming o
 
 		--text: #ededf2;
 		--text-dim: #7c7c92;
-		--text-muted: #484860;
+		--text-muted: #5c5c72;
 
 		--accent-coral: #ff4f38;
 		--accent-peach: #ff7e52;
@@ -235,6 +240,8 @@ const { title, description = "Lightweight keyboard tunnel for pair programming o
 
 		--keycap-shadow: 0 4px 0 #050507, 0 6px 20px rgba(0,0,0,0.6);
 		--keycap-shadow-sm: 0 3px 0 #050507, 0 4px 12px rgba(0,0,0,0.5);
+		--keycap-shadow-pressed: 0 1px 0 #050507, 0 1px 4px rgba(0,0,0,0.5);
+		--keycap-shadow-sm-pressed: 0 0px 0 #050507, 0 1px 3px rgba(0,0,0,0.4);
 
 		--terminal-bg: #08080d;
 		--terminal-bar: #0f0f16;
@@ -267,8 +274,34 @@ const { title, description = "Lightweight keyboard tunnel for pair programming o
 
 		--bg-texture:
 			radial-gradient(ellipse 100% 60% at 50% -5%, rgba(255, 79, 56, 0.08) 0%, transparent 60%),
-			repeating-linear-gradient(0deg, transparent 0, transparent 47px, rgba(255,255,255,0.012) 47px, rgba(255,255,255,0.012) 48px),
-			repeating-linear-gradient(90deg, transparent 0, transparent 47px, rgba(255,255,255,0.012) 47px, rgba(255,255,255,0.012) 48px);
+			repeating-linear-gradient(0deg, transparent 0, transparent 47px, rgba(255,255,255,0.025) 47px, rgba(255,255,255,0.025) 48px),
+			repeating-linear-gradient(90deg, transparent 0, transparent 47px, rgba(255,255,255,0.025) 47px, rgba(255,255,255,0.025) 48px);
+	}
+
+	:focus-visible {
+		outline: 2px solid var(--accent-coral);
+		outline-offset: 2px;
+	}
+
+	:focus:not(:focus-visible) {
+		outline: none;
+	}
+
+	.skip-link {
+		position: absolute;
+		top: -100%;
+		left: 16px;
+		z-index: 9999;
+		padding: 8px 16px;
+		background: var(--accent-coral);
+		color: #fff;
+		font-weight: 600;
+		border-radius: var(--radius-sm);
+		text-decoration: none;
+	}
+
+	.skip-link:focus {
+		top: 16px;
 	}
 
 	html {
@@ -320,7 +353,7 @@ const { title, description = "Lightweight keyboard tunnel for pair programming o
 
 	/* ---- Sections ---- */
 	.section {
-		padding: 100px 0;
+		padding: 80px 0;
 	}
 
 	.section-dark {
@@ -339,7 +372,7 @@ const { title, description = "Lightweight keyboard tunnel for pair programming o
 		width: 60%;
 		height: 1px;
 		background: linear-gradient(90deg, transparent, var(--accent-coral), transparent);
-		opacity: 0;
+		opacity: 0.2;
 	}
 
 	[data-theme="dark"] .section-dark::before {
@@ -352,6 +385,12 @@ const { title, description = "Lightweight keyboard tunnel for pair programming o
 		font-weight: 700;
 		text-align: center;
 		margin-bottom: 16px;
+		letter-spacing: -0.02em;
+	}
+
+	.section h3 {
+		font-family: var(--font-display);
+		font-weight: 700;
 		letter-spacing: -0.02em;
 	}
 
@@ -375,6 +414,12 @@ const { title, description = "Lightweight keyboard tunnel for pair programming o
 		border-radius: var(--radius-sm);
 		box-shadow: var(--keycap-shadow-sm);
 		margin-bottom: 16px;
+		transition: transform 0.1s ease, box-shadow 0.1s ease;
+	}
+
+	.keycap:hover {
+		transform: translateY(3px);
+		box-shadow: var(--keycap-shadow-pressed);
 	}
 
 	.keycap-bad {
@@ -405,6 +450,12 @@ const { title, description = "Lightweight keyboard tunnel for pair programming o
 		box-shadow: var(--keycap-shadow-sm);
 		color: var(--accent-peach);
 		flex-shrink: 0;
+		transition: transform 0.1s ease, box-shadow 0.1s ease;
+	}
+
+	.keycap-small:hover {
+		transform: translateY(2px);
+		box-shadow: var(--keycap-shadow-sm-pressed);
 	}
 
 	/* ---- Shared terminal styling ---- */
@@ -472,6 +523,29 @@ const { title, description = "Lightweight keyboard tunnel for pair programming o
 		background: var(--gradient-primary);
 		color: var(--btn-primary-text);
 		box-shadow: var(--keycap-shadow);
+		position: relative;
+		overflow: hidden;
+	}
+
+	.btn-primary::after {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: -100%;
+		width: 60%;
+		height: 100%;
+		background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+		transform: skewX(-15deg);
+		pointer-events: none;
+	}
+
+	.btn-primary:hover::after {
+		animation: btn-shimmer 0.55s ease-in-out;
+	}
+
+	@keyframes btn-shimmer {
+		from { left: -100%; }
+		to { left: 160%; }
 	}
 
 	.btn-primary:hover {

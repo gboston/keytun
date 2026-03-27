@@ -58,3 +58,18 @@ Go 1.25.0 with: `spf13/cobra` (CLI), `gorilla/websocket` (WebSocket), `creack/pt
 ## Website
 
 The `website/` directory contains an Astro.js documentation site (separate Node.js toolchain, not part of the Go build).
+
+## Browser automation
+
+`agent-browser` is available system-wide for browser automation tasks (screenshots, navigation, interaction).
+
+```bash
+agent-browser open <url>          # Navigate to URL
+agent-browser screenshot <path>   # Take a screenshot
+agent-browser scroll down <px>    # Scroll
+agent-browser eval <js>           # Run JavaScript
+agent-browser snapshot            # Accessibility tree with refs
+agent-browser click <selector>    # Click element
+```
+
+Use this to visually verify website changes against the local dev server at `http://localhost:4321`.

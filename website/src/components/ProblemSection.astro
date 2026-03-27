@@ -3,27 +3,27 @@
 // ABOUTME: Highlights keytun as the solution with a visually distinct card.
 ---
 
-<section class="section" id="problem">
+<section class="section section-dark" id="problem">
 	<div class="container">
 		<h2>The problem with screensharing</h2>
 		<div class="problem-grid">
 			<div class="problem-card">
-				<div class="keycap keycap-bad">🗣</div>
+				<div class="keycap keycap-bad" aria-hidden="true">🗣</div>
 				<h3>Dictating commands</h3>
 				<p>"Capital D, dash, dash, no-cache, space, dot, no the other dot..."</p>
 			</div>
 			<div class="problem-card">
-				<div class="keycap keycap-bad">🔄</div>
+				<div class="keycap keycap-bad" aria-hidden="true">🔄</div>
 				<h3>Swapping screen control</h3>
 				<p>Request control, wait for approval, fumble with resolution differences, give it back.</p>
 			</div>
 			<div class="problem-card">
-				<div class="keycap keycap-bad">🛠</div>
+				<div class="keycap keycap-bad" aria-hidden="true">🛠</div>
 				<h3>Full pair-programming tools</h3>
 				<p>VS Code Live Share, tmate, tmux — all overkill for "let me just type this one command."</p>
 			</div>
 			<div class="problem-card solution">
-				<div class="keycap keycap-good">⌨</div>
+				<div class="keycap keycap-good" aria-hidden="true">⌨</div>
 				<h3>keytun</h3>
 				<p>Share a code. They type. You see it live on your screenshare. Done.</p>
 			</div>
@@ -48,12 +48,14 @@
 
 	.problem-card.solution {
 		border-color: var(--solution-border);
+		border-top: 3px solid var(--accent-coral);
 		background: var(--solution-bg);
+		padding-top: 25px;
 		transition: box-shadow 0.25s;
 	}
 
 	[data-theme="dark"] .problem-card.solution {
-		box-shadow: 0 0 40px rgba(255, 79, 56, 0.12), 0 0 0 1px rgba(255, 79, 56, 0.15) inset;
+		box-shadow: 0 0 60px rgba(255, 79, 56, 0.18), 0 0 0 1px rgba(255, 79, 56, 0.2) inset;
 	}
 
 	.problem-card h3 {

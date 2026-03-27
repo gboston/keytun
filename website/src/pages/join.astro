@@ -7,8 +7,9 @@ import Footer from '../components/Footer.astro';
 ---
 
 <Layout title="Join a Session — keytun" description="Enter a session code to join a keytun session from your browser.">
+	<div class="page-wrapper">
 	<Nav />
-	<main>
+	<main id="main-content">
 		<div class="join-page">
 			<h1>Join a session</h1>
 			<p class="subtitle">Enter the session code your colleague shared with you.</p>
@@ -51,6 +52,7 @@ import Footer from '../components/Footer.astro';
 		</div>
 	</main>
 	<Footer />
+	</div>
 
 	<script>
 		const form = document.getElementById('join-form') as HTMLFormElement;
@@ -86,8 +88,14 @@ import Footer from '../components/Footer.astro';
 </Layout>
 
 <style>
-	main {
+	.page-wrapper {
 		min-height: 100vh;
+		display: flex;
+		flex-direction: column;
+	}
+
+	main {
+		flex: 1;
 		display: flex;
 		align-items: center;
 		justify-content: center;

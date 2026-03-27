@@ -1,14 +1,17 @@
 ---
-// ABOUTME: Installation instructions section with Go install and from-source options.
-// ABOUTME: Also shows quick-start usage examples for host, client, and relay.
+// ABOUTME: Installation instructions section with Shell and Homebrew install options.
+// ABOUTME: Shows a side-by-side workflow diagram of host and client terminal usage.
 ---
 
 <section class="section section-dark" id="install">
 	<div class="container">
 		<h2>Get started</h2>
 		<div class="install-grid">
-			<div class="install-card">
-				<h3>Shell</h3>
+			<div class="install-card" id="card-shell">
+				<div class="install-card-header">
+					<h3>Shell</h3>
+					<span class="install-badge" id="badge-shell">Recommended</span>
+				</div>
 				<div class="terminal" data-copy="curl -fsSL keytun.com/install.sh | sh">
 					<div class="terminal-bar">
 						<div class="terminal-dots">
@@ -27,8 +30,11 @@
 					</div>
 				</div>
 			</div>
-			<div class="install-card">
-				<h3>Homebrew</h3>
+			<div class="install-card" id="card-brew">
+				<div class="install-card-header">
+					<h3>Homebrew</h3>
+					<span class="install-badge install-badge-macos" id="badge-brew">macOS</span>
+				</div>
 				<div class="terminal" data-copy="brew install --cask gboston/tap/keytun">
 					<div class="terminal-bar">
 						<div class="terminal-dots">
@@ -48,61 +54,24 @@
 				</div>
 			</div>
 		</div>
-		<div class="usage-example">
-			<h3>Usage</h3>
-			<div class="usage-grid">
-				<div class="usage-block">
-					<span class="usage-label">Host (developer)</span>
-					<div class="terminal" data-copy="keytun host">
-						<div class="terminal-bar">
-							<div class="terminal-dots">
-								<span class="dot dot-red"></span>
-								<span class="dot dot-yellow"></span>
-								<span class="dot dot-green"></span>
-							</div>
-							<span class="terminal-title">Terminal</span>
-							<button class="copy-btn" aria-label="Copy to clipboard">
-								<svg class="copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-								<svg class="check-icon" style="display:none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-							</button>
-						</div>
-						<div class="terminal-body">
-							<div class="line"><span class="prompt">$</span> keytun host</div>
-						</div>
-					</div>
-				</div>
-				<div class="usage-block">
-					<span class="usage-label">Client (helper)</span>
-					<div class="terminal" data-copy="keytun join keen-fox-42">
-						<div class="terminal-bar">
-							<div class="terminal-dots">
-								<span class="dot dot-red"></span>
-								<span class="dot dot-yellow"></span>
-								<span class="dot dot-green"></span>
-							</div>
-							<span class="terminal-title">Terminal</span>
-							<button class="copy-btn" aria-label="Copy to clipboard">
-								<svg class="copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-								<svg class="check-icon" style="display:none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-							</button>
-						</div>
-						<div class="terminal-body">
-							<div class="line"><span class="prompt">$</span> keytun join keen-fox-42</div>
-						</div>
-					</div>
-				</div>
-				<p class="relay-note">Connects to <code>relay.keytun.com</code> by default — all traffic is end-to-end encrypted. The relay only sees ciphertext.</p>
-			</div>
-		</div>
+
 	</div>
 </section>
 
 <style>
+	:global(#install.section-dark::before) {
+		opacity: 0.45;
+	}
+
+	:global([data-theme="dark"] #install.section-dark::before) {
+		opacity: 0.65;
+	}
+
 	.install-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
 		gap: 20px;
-		margin: 48px 0 48px;
+		margin: 48px 0 56px;
 	}
 
 	.install-card {
@@ -112,48 +81,46 @@
 		padding: 28px 24px;
 		display: flex;
 		flex-direction: column;
+		gap: 16px;
+		transition: border-color 0.2s;
 	}
 
-	.install-card .terminal {
-		flex: 1;
+	.install-card.highlighted {
+		border-color: rgba(255, 79, 56, 0.3);
+	}
+
+	[data-theme="dark"] .install-card.highlighted {
+		box-shadow: 0 0 0 1px rgba(255, 79, 56, 0.08) inset, 0 8px 24px rgba(0,0,0,0.4);
+	}
+
+	.install-card-header {
+		display: flex;
+		align-items: center;
+		gap: 10px;
 	}
 
 	.install-card h3 {
 		font-size: 1rem;
 		font-weight: 600;
-		margin-bottom: 16px;
 	}
 
-	.usage-example {
-		max-width: 700px;
-		margin: 0 auto;
-	}
-
-	.usage-example h3 {
-		font-size: 1.2rem;
-		font-weight: 600;
-		margin-bottom: 20px;
-		text-align: center;
-	}
-
-	.usage-grid {
-		display: flex;
-		flex-direction: column;
-		gap: 16px;
-	}
-
-	.usage-block {
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-	}
-
-	.usage-label {
+	.install-badge {
 		font-family: var(--font-mono);
-		font-size: 0.78rem;
-		color: var(--text-muted);
+		font-size: 0.65rem;
+		font-weight: 600;
+		letter-spacing: 0.08em;
 		text-transform: uppercase;
-		letter-spacing: 0.05em;
+		padding: 3px 8px;
+		border-radius: 4px;
+		background: rgba(255, 79, 56, 0.08);
+		border: 1px solid rgba(255, 79, 56, 0.18);
+		color: var(--accent-coral);
+	}
+
+	.install-badge-macos {
+		background: rgba(62, 201, 245, 0.08);
+		border-color: rgba(62, 201, 245, 0.18);
+		color: var(--accent-sky);
 	}
 
 	.line {
@@ -164,11 +131,6 @@
 	.prompt {
 		color: #6bcb77;
 		margin-right: 8px;
-	}
-
-	.terminal-bar {
-		display: flex;
-		align-items: center;
 	}
 
 	.copy-btn {
@@ -202,6 +164,7 @@
 </style>
 
 <script>
+	// Copy-to-clipboard
 	document.querySelectorAll('.copy-btn').forEach(btn => {
 		btn.addEventListener('click', () => {
 			const terminal = btn.closest('.terminal');
@@ -214,7 +177,7 @@
 			navigator.clipboard.writeText(text).then(() => {
 				copyIcon.style.display = 'none';
 				checkIcon.style.display = 'block';
-				checkIcon.style.color = '#6bcb77';
+				(checkIcon as HTMLElement).style.color = '#6bcb77';
 				setTimeout(() => {
 					copyIcon.style.display = '';
 					checkIcon.style.display = 'none';
@@ -222,4 +185,14 @@
 			});
 		});
 	});
+
+	// Highlight install method based on detected OS
+	const isMac = /Mac/i.test(navigator.platform) || /Mac/i.test(navigator.userAgent);
+	if (isMac) {
+		document.getElementById('card-brew')?.classList.add('highlighted');
+		const shellBadge = document.getElementById('badge-shell');
+		if (shellBadge) shellBadge.style.display = 'none';
+	} else {
+		document.getElementById('card-shell')?.classList.add('highlighted');
+	}
 </script>
