@@ -17,6 +17,8 @@
   <a href="https://keytun.com">Website</a>
 </p>
 
+<p align="center"><img src="https://img.shields.io/github/v/release/gboston/keytun" alt="Latest release" /> <img src="https://img.shields.io/github/downloads/gboston/keytun/total?label=downloads" alt="Total downloads" /> <img src="https://img.shields.io/github/actions/workflow/status/gboston/keytun/release.yml?label=build" alt="Build status" /> <img src="https://img.shields.io/github/license/gboston/keytun" alt="License" /> <img src="https://img.shields.io/github/go-mod/go-version/gboston/keytun" alt="Go version" /></p>
+
 ---
 
 ```
