@@ -57,6 +57,13 @@
 		padding: 28px 24px;
 		display: flex;
 		flex-direction: column;
+		transition: border-color 0.25s, box-shadow 0.25s, transform 0.25s;
+	}
+
+	.roadmap-card:hover {
+		border-color: var(--border-accent);
+		box-shadow: 0 0 0 1px rgba(255, 79, 56, 0.08), 0 12px 40px rgba(0,0,0,0.3), 0 0 28px rgba(255, 79, 56, 0.07);
+		transform: translateY(-3px);
 	}
 
 	.roadmap-icon {

@@ -60,7 +60,7 @@ const { title, description = "Lightweight keyboard tunnel for pair programming o
 				var saved = localStorage.getItem('theme');
 				if (saved) {
 					document.documentElement.setAttribute('data-theme', saved);
-				} else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+				} else {
 					document.documentElement.setAttribute('data-theme', 'dark');
 				}
 			})();
@@ -68,7 +68,7 @@ const { title, description = "Lightweight keyboard tunnel for pair programming o
 
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+		<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 	</head>
 	<body>
 		<slot />
@@ -162,6 +162,8 @@ const { title, description = "Lightweight keyboard tunnel for pair programming o
 
 		--font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 		--font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+		--font-display: 'Syne', var(--font-sans);
+		--bg-texture: none;
 
 		/* Light theme (default) */
 		--bg: #ffffff;
@@ -210,58 +212,63 @@ const { title, description = "Lightweight keyboard tunnel for pair programming o
 	}
 
 	[data-theme="dark"] {
-		--bg: #1a1a2e;
-		--bg-surface: #16213e;
-		--bg-card: #1f2b47;
-		--bg-elevated: #253555;
+		--bg: #0c0c10;
+		--bg-surface: #141418;
+		--bg-card: #1c1c24;
+		--bg-elevated: #222230;
 
-		--text: #e8e8e8;
-		--text-dim: #8892a4;
-		--text-muted: #5a6478;
+		--text: #ededf2;
+		--text-dim: #7c7c92;
+		--text-muted: #484860;
 
-		--accent-coral: #ff6b6b;
-		--accent-peach: #ffa07a;
-		--accent-amber: #ffd93d;
-		--accent-mint: #6bcb77;
-		--accent-lavender: #a78bfa;
-		--accent-sky: #4cc9f0;
+		--accent-coral: #ff4f38;
+		--accent-peach: #ff7e52;
+		--accent-amber: #ffba30;
+		--accent-mint: #4dde7a;
+		--accent-lavender: #b08cff;
+		--accent-sky: #3ec9f5;
 
 		--gradient-primary: linear-gradient(135deg, var(--accent-coral), var(--accent-peach), var(--accent-amber));
 
-		--border: rgba(255, 255, 255, 0.06);
-		--border-accent: rgba(255, 160, 122, 0.3);
+		--border: rgba(255, 255, 255, 0.055);
+		--border-accent: rgba(255, 79, 56, 0.4);
 
-		--keycap-shadow: 0 3px 0 #0d1117, 0 5px 10px rgba(0,0,0,0.3);
-		--keycap-shadow-sm: 0 2px 0 #0d1117, 0 3px 6px rgba(0,0,0,0.2);
+		--keycap-shadow: 0 4px 0 #050507, 0 6px 20px rgba(0,0,0,0.6);
+		--keycap-shadow-sm: 0 3px 0 #050507, 0 4px 12px rgba(0,0,0,0.5);
 
-		--terminal-bg: #141925;
-		--terminal-bar: #1a2030;
-		--terminal-border: transparent;
+		--terminal-bg: #08080d;
+		--terminal-bar: #0f0f16;
+		--terminal-border: rgba(255,255,255,0.04);
 
-		--nav-bg: rgba(26, 26, 46, 0.85);
-		--nav-border: rgba(255, 255, 255, 0.06);
+		--nav-bg: rgba(12, 12, 16, 0.92);
+		--nav-border: rgba(255, 255, 255, 0.055);
 
-		--code-bg: #253555;
+		--code-bg: #1c1c26;
 		--code-color: var(--accent-peach);
 		--code-border: rgba(255, 255, 255, 0.08);
 
-		--btn-primary-text: #1a1a2e;
-		--btn-ghost-border: rgba(255, 255, 255, 0.12);
-		--btn-ghost-hover-border: rgba(255, 255, 255, 0.25);
-		--btn-primary-hover-shadow: 0 4px 0 #0d1117, 0 8px 20px rgba(0,0,0,0.4);
-		--btn-primary-active-shadow: 0 1px 0 #0d1117, 0 2px 4px rgba(0,0,0,0.3);
+		--btn-primary-text: #0c0c10;
+		--btn-ghost-border: rgba(255, 255, 255, 0.1);
+		--btn-ghost-hover-border: rgba(255, 255, 255, 0.22);
+		--btn-primary-hover-shadow: 0 4px 0 #050507, 0 8px 28px rgba(255, 79, 56, 0.35);
+		--btn-primary-active-shadow: 0 1px 0 #050507, 0 2px 4px rgba(0,0,0,0.5);
 
-		--badge-bg: rgba(255, 160, 122, 0.1);
-		--badge-border: rgba(255, 160, 122, 0.2);
+		--badge-bg: rgba(255, 79, 56, 0.1);
+		--badge-border: rgba(255, 79, 56, 0.22);
 
-		--solution-bg: rgba(255, 160, 122, 0.05);
-		--solution-border: rgba(255, 160, 122, 0.3);
+		--solution-bg: rgba(255, 126, 82, 0.07);
+		--solution-border: rgba(255, 126, 82, 0.3);
 
-		--msg-type-bg: rgba(255, 160, 122, 0.1);
-		--msg-type-border: rgba(255, 160, 122, 0.15);
+		--msg-type-bg: rgba(255, 79, 56, 0.1);
+		--msg-type-border: rgba(255, 79, 56, 0.15);
 
 		--link-color: var(--accent-sky);
 		--link-hover: var(--accent-peach);
+
+		--bg-texture:
+			radial-gradient(ellipse 100% 60% at 50% -5%, rgba(255, 79, 56, 0.08) 0%, transparent 60%),
+			repeating-linear-gradient(0deg, transparent 0, transparent 47px, rgba(255,255,255,0.012) 47px, rgba(255,255,255,0.012) 48px),
+			repeating-linear-gradient(90deg, transparent 0, transparent 47px, rgba(255,255,255,0.012) 47px, rgba(255,255,255,0.012) 48px);
 	}
 
 	html {
@@ -271,6 +278,8 @@ const { title, description = "Lightweight keyboard tunnel for pair programming o
 	body {
 		font-family: var(--font-sans);
 		background: var(--bg);
+		background-image: var(--bg-texture);
+		background-attachment: fixed;
 		color: var(--text);
 		line-height: 1.6;
 		-webkit-font-smoothing: antialiased;
@@ -316,14 +325,34 @@ const { title, description = "Lightweight keyboard tunnel for pair programming o
 
 	.section-dark {
 		background: var(--bg-surface);
+		border-top: 1px solid var(--border);
+		border-bottom: 1px solid var(--border);
+		position: relative;
+	}
+
+	.section-dark::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 50%;
+		transform: translateX(-50%);
+		width: 60%;
+		height: 1px;
+		background: linear-gradient(90deg, transparent, var(--accent-coral), transparent);
+		opacity: 0;
+	}
+
+	[data-theme="dark"] .section-dark::before {
+		opacity: 0.35;
 	}
 
 	.section h2 {
+		font-family: var(--font-display);
 		font-size: clamp(1.8rem, 4vw, 2.4rem);
 		font-weight: 700;
 		text-align: center;
 		margin-bottom: 16px;
-		letter-spacing: -0.01em;
+		letter-spacing: -0.02em;
 	}
 
 	.section-sub {
@@ -358,7 +387,8 @@ const { title, description = "Lightweight keyboard tunnel for pair programming o
 	}
 
 	[data-theme="dark"] .keycap-good {
-		background: linear-gradient(135deg, rgba(255,107,107,0.2), rgba(255,160,122,0.2));
+		background: linear-gradient(135deg, rgba(255,79,56,0.2), rgba(255,126,82,0.2));
+		box-shadow: var(--keycap-shadow-sm), 0 0 16px rgba(255, 79, 56, 0.2);
 	}
 
 	.keycap-small {
@@ -482,7 +512,7 @@ const { title, description = "Lightweight keyboard tunnel for pair programming o
 	[data-theme="dark"] .feature,
 	[data-theme="dark"] .install-card,
 	[data-theme="dark"] .protocol-msg {
-		box-shadow: none;
+		box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.4);
 	}
 
 	/* ---- Scroll animations ---- */

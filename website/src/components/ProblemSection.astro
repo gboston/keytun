@@ -49,6 +49,11 @@
 	.problem-card.solution {
 		border-color: var(--solution-border);
 		background: var(--solution-bg);
+		transition: box-shadow 0.25s;
+	}
+
+	[data-theme="dark"] .problem-card.solution {
+		box-shadow: 0 0 40px rgba(255, 79, 56, 0.12), 0 0 0 1px rgba(255, 79, 56, 0.15) inset;
 	}
 
 	.problem-card h3 {
