@@ -1,0 +1,703 @@
+---
+// ABOUTME: Interactive tabbed showcase with visual walkthroughs for Terminal Mode, System Mode, and Web Client.
+// ABOUTME: Replaces the Modes section with richer step-by-step demonstrations.
+---
+
+<section class="section section-dark" id="showcase">
+	<div class="container">
+		<h2>See it in action</h2>
+		<p class="section-sub">Three ways to use keytun — pick what fits your workflow.</p>
+
+		<div class="showcase-tabs">
+			<button class="tab active" data-tab="terminal">
+				<span class="tab-icon">🖥</span>
+				Terminal mode
+			</button>
+			<button class="tab" data-tab="system">
+				<span class="tab-icon">🎯</span>
+				System mode
+			</button>
+			<button class="tab" data-tab="webclient">
+				<span class="tab-icon">🌐</span>
+				Web client
+			</button>
+		</div>
+
+		<!-- Terminal Mode -->
+		<div class="showcase-panel active" data-panel="terminal">
+			<div class="walkthrough">
+				<div class="walkthrough-step">
+					<div class="step-marker"><span class="step-num keycap-small">1</span></div>
+					<div class="step-body">
+						<h3>Host starts a session</h3>
+						<p>Run <code>keytun host</code> to spawn a PTY and get a session code.</p>
+						<div class="terminal">
+							<div class="terminal-bar">
+								<div class="terminal-dots">
+									<span class="dot dot-red"></span>
+									<span class="dot dot-yellow"></span>
+									<span class="dot dot-green"></span>
+								</div>
+								<span class="terminal-title">Host terminal</span>
+							</div>
+							<div class="terminal-body">
+								<div class="line"><span class="prompt">$</span> keytun host</div>
+								<div class="line output">  keytun v0.1.0</div>
+								<div class="line output">  Session: <span class="code-highlight">keen-fox-42</span></div>
+								<div class="line output">  Waiting for client...</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="walkthrough-step">
+					<div class="step-marker"><span class="step-num keycap-small">2</span></div>
+					<div class="step-body">
+						<h3>Colleague joins via CLI</h3>
+						<p>Your colleague runs <code>keytun join</code> with the session code.</p>
+						<div class="terminal">
+							<div class="terminal-bar">
+								<div class="terminal-dots">
+									<span class="dot dot-red"></span>
+									<span class="dot dot-yellow"></span>
+									<span class="dot dot-green"></span>
+								</div>
+								<span class="terminal-title">Client terminal</span>
+							</div>
+							<div class="terminal-body">
+								<div class="line"><span class="prompt">$</span> keytun join keen-fox-42</div>
+								<div class="line output">  Connected to <span class="code-highlight">keen-fox-42</span></div>
+								<div class="line output">  You are now typing into the remote terminal.</div>
+								<div class="line output dim">  Press Esc twice to disconnect.</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="walkthrough-step">
+					<div class="step-marker"><span class="step-num keycap-small">3</span></div>
+					<div class="step-body">
+						<h3>Keystrokes flow in real time</h3>
+						<p>The client types commands — they appear in the host's PTY. Arrow keys, tab completion, Ctrl sequences all work.</p>
+						<div class="terminal-pair">
+							<div class="terminal terminal-sm">
+								<div class="terminal-bar">
+									<div class="terminal-dots">
+										<span class="dot dot-red"></span>
+										<span class="dot dot-yellow"></span>
+										<span class="dot dot-green"></span>
+									</div>
+									<span class="terminal-title">Client types</span>
+								</div>
+								<div class="terminal-body">
+									<div class="line typing-line"><span class="prompt">→</span> docker compose up -d<span class="cursor">█</span></div>
+								</div>
+							</div>
+							<div class="flow-arrow">
+								<svg width="40" height="24" viewBox="0 0 40 24"><path d="M4 12h28m0 0l-6-5m6 5l-6 5" stroke="var(--accent-coral)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+							</div>
+							<div class="terminal terminal-sm">
+								<div class="terminal-bar">
+									<div class="terminal-dots">
+										<span class="dot dot-red"></span>
+										<span class="dot dot-yellow"></span>
+										<span class="dot dot-green"></span>
+									</div>
+									<span class="terminal-title">Host sees</span>
+								</div>
+								<div class="terminal-body">
+									<div class="line output">  ✓ Client connected</div>
+									<div class="line"><span class="prompt">$</span> docker compose up -d<span class="cursor">█</span></div>
+								</div>
+							</div>
+						</div>
+						<div class="feature-pills">
+							<span class="pill">Arrow keys</span>
+							<span class="pill">Tab completion</span>
+							<span class="pill">Ctrl+C</span>
+							<span class="pill">Full PTY</span>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- System Mode -->
+		<div class="showcase-panel" data-panel="system">
+			<div class="walkthrough">
+				<div class="walkthrough-step">
+					<div class="step-marker"><span class="step-num keycap-small">1</span></div>
+					<div class="step-body">
+						<h3>Host starts in system mode</h3>
+						<p>Target a specific application window by name. Keystrokes are injected at the OS level.</p>
+						<div class="terminal">
+							<div class="terminal-bar">
+								<div class="terminal-dots">
+									<span class="dot dot-red"></span>
+									<span class="dot dot-yellow"></span>
+									<span class="dot dot-green"></span>
+								</div>
+								<span class="terminal-title">Host terminal</span>
+							</div>
+							<div class="terminal-body">
+								<div class="line"><span class="prompt">$</span> keytun host --mode system --target "VS Code"</div>
+								<div class="line output">  keytun v0.1.0</div>
+								<div class="line output">  Mode: <span class="code-highlight">system</span> → targeting "VS Code"</div>
+								<div class="line output">  Session: <span class="code-highlight">bold-owl-17</span></div>
+								<div class="line output">  Waiting for client...</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="walkthrough-step">
+					<div class="step-marker"><span class="step-num keycap-small">2</span></div>
+					<div class="step-body">
+						<h3>Colleague joins and types</h3>
+						<p>Same join flow — but keystrokes go to the targeted app, not a terminal.</p>
+						<div class="terminal">
+							<div class="terminal-bar">
+								<div class="terminal-dots">
+									<span class="dot dot-red"></span>
+									<span class="dot dot-yellow"></span>
+									<span class="dot dot-green"></span>
+								</div>
+								<span class="terminal-title">Client terminal</span>
+							</div>
+							<div class="terminal-body">
+								<div class="line"><span class="prompt">$</span> keytun join bold-owl-17</div>
+								<div class="line output">  Connected to <span class="code-highlight">bold-owl-17</span></div>
+								<div class="line output">  Target: <span class="code-highlight">VS Code</span> (system mode)</div>
+								<div class="line output dim">  Press Esc twice to disconnect.</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="walkthrough-step">
+					<div class="step-marker"><span class="step-num keycap-small">3</span></div>
+					<div class="step-body">
+						<h3>Keystrokes appear in the app</h3>
+						<p>Your colleague types code into your IDE while you watch on screenshare. Works with any app that accepts keyboard input.</p>
+						<div class="app-mockup">
+							<div class="app-bar">
+								<div class="terminal-dots">
+									<span class="dot dot-red"></span>
+									<span class="dot dot-yellow"></span>
+									<span class="dot dot-green"></span>
+								</div>
+								<span class="app-title">VS Code — main.go</span>
+							</div>
+							<div class="app-body">
+								<div class="code-lines">
+									<span class="line-num">14</span><span class="code-kw">func</span> <span class="code-fn">handleRequest</span>(w http.ResponseWriter, r *http.Request) {"{"}
+								</div>
+								<div class="code-lines">
+									<span class="line-num">15</span>    <span class="code-kw">if</span> r.Method != <span class="code-str">"POST"</span> {"{"}
+								</div>
+								<div class="code-lines active-line">
+									<span class="line-num">16</span>    	http.Error(w, <span class="code-str">"method not allowed"</span>, 405)<span class="cursor">█</span>
+								</div>
+								<div class="code-lines">
+									<span class="line-num">17</span>    {"}"}
+								</div>
+							</div>
+						</div>
+						<div class="feature-pills">
+							<span class="pill">Any application</span>
+							<span class="pill">Window targeting</span>
+							<span class="pill">OS-level injection</span>
+							<span class="pill pill-badge">macOS only</span>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Web Client -->
+		<div class="showcase-panel" data-panel="webclient">
+			<div class="walkthrough">
+				<div class="walkthrough-step">
+					<div class="step-marker"><span class="step-num keycap-small">1</span></div>
+					<div class="step-body">
+						<h3>Host shares a link</h3>
+						<p>The host gets a direct join URL — just drop it in the call chat.</p>
+						<div class="terminal">
+							<div class="terminal-bar">
+								<div class="terminal-dots">
+									<span class="dot dot-red"></span>
+									<span class="dot dot-yellow"></span>
+									<span class="dot dot-green"></span>
+								</div>
+								<span class="terminal-title">Host terminal</span>
+							</div>
+							<div class="terminal-body">
+								<div class="line"><span class="prompt">$</span> keytun host</div>
+								<div class="line output">  keytun v0.1.0</div>
+								<div class="line output">  Session: <span class="code-highlight">keen-fox-42</span></div>
+								<div class="line output">  Join:    <span class="code-highlight">keytun.com/s/keen-fox-42</span></div>
+								<div class="line output">  Waiting for client...</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="walkthrough-step">
+					<div class="step-marker"><span class="step-num keycap-small">2</span></div>
+					<div class="step-body">
+						<h3>Colleague opens the link in their browser</h3>
+						<p>No install needed. The browser connects via WebSocket with end-to-end encryption.</p>
+						<div class="browser-mockup">
+							<div class="browser-bar">
+								<div class="terminal-dots">
+									<span class="dot dot-red"></span>
+									<span class="dot dot-yellow"></span>
+									<span class="dot dot-green"></span>
+								</div>
+								<div class="browser-url">
+									<svg class="lock-icon" width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="3" y="7" width="10" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+									keytun.com/s/keen-fox-42
+								</div>
+							</div>
+							<div class="browser-body">
+								<div class="browser-session-header">
+									<span class="browser-logo">keytun</span>
+									<span class="browser-badge connected">Connected</span>
+								</div>
+								<div class="browser-terminal">
+									<div class="line"><span class="prompt">$</span> <span class="typing-text">_</span></div>
+								</div>
+								<div class="browser-status">
+									<span class="status-dot"></span>
+									End-to-end encrypted · Session <span class="code-highlight">keen-fox-42</span>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="walkthrough-step">
+					<div class="step-marker"><span class="step-num keycap-small">3</span></div>
+					<div class="step-body">
+						<h3>Full terminal in the browser</h3>
+						<p>A real terminal emulator powered by ghostty-web. Your colleague sees output and types commands — just like a local shell.</p>
+						<div class="browser-mockup">
+							<div class="browser-bar">
+								<div class="terminal-dots">
+									<span class="dot dot-red"></span>
+									<span class="dot dot-yellow"></span>
+									<span class="dot dot-green"></span>
+								</div>
+								<div class="browser-url">
+									<svg class="lock-icon" width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="3" y="7" width="10" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+									keytun.com/s/keen-fox-42
+								</div>
+							</div>
+							<div class="browser-body browser-body-terminal">
+								<div class="line output">  Connected to <span class="code-highlight">keen-fox-42</span></div>
+								<div class="line"><span class="prompt">$</span> ls -la</div>
+								<div class="line output">drwxr-xr-x  12 user  staff   384 Mar 27 10:04 .</div>
+								<div class="line output">-rw-r--r--   1 user  staff  1247 Mar 27 10:04 main.go</div>
+								<div class="line output">-rw-r--r--   1 user  staff   893 Mar 27 09:58 go.mod</div>
+								<div class="line"><span class="prompt">$</span> go test ./...<span class="cursor">█</span></div>
+							</div>
+						</div>
+						<div class="feature-pills">
+							<span class="pill">No install</span>
+							<span class="pill">E2E encrypted</span>
+							<span class="pill">Full terminal</span>
+							<span class="pill">Esc×2 to disconnect</span>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<script>
+	const tabs = document.querySelectorAll<HTMLElement>('.showcase-tabs .tab');
+	const panels = document.querySelectorAll<HTMLElement>('.showcase-panel');
+
+	tabs.forEach(tab => {
+		tab.addEventListener('click', () => {
+			const target = tab.dataset.tab;
+
+			tabs.forEach(t => t.classList.remove('active'));
+			tab.classList.add('active');
+
+			panels.forEach(p => {
+				if (p.dataset.panel === target) {
+					p.classList.add('active');
+				} else {
+					p.classList.remove('active');
+				}
+			});
+		});
+	});
+</script>
+
+<style is:global>
+	/* ---- Tabs ---- */
+	.showcase-tabs {
+		display: flex;
+		gap: 8px;
+		justify-content: center;
+		margin-top: 40px;
+		margin-bottom: 48px;
+		flex-wrap: wrap;
+	}
+
+	.tab {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 12px 24px;
+		background: var(--bg-card);
+		border: 1px solid var(--border);
+		border-radius: 50px;
+		font-family: var(--font-sans);
+		font-size: 0.92rem;
+		font-weight: 600;
+		color: var(--text-dim);
+		cursor: pointer;
+		transition: all 0.2s;
+	}
+
+	.tab:hover {
+		border-color: var(--accent-coral);
+		color: var(--text);
+	}
+
+	.tab.active {
+		background: var(--gradient-primary);
+		color: var(--btn-primary-text);
+		border-color: transparent;
+	}
+
+	.tab-icon {
+		font-size: 1rem;
+	}
+
+	/* ---- Panels ---- */
+	.showcase-panel {
+		display: none;
+	}
+
+	.showcase-panel.active {
+		display: block;
+		animation: fadeIn 0.3s ease;
+	}
+
+	@keyframes fadeIn {
+		from { opacity: 0; transform: translateY(8px); }
+		to { opacity: 1; transform: translateY(0); }
+	}
+
+	/* ---- Walkthrough ---- */
+	.walkthrough {
+		max-width: 680px;
+		margin: 0 auto;
+		display: flex;
+		flex-direction: column;
+		gap: 40px;
+	}
+
+	.walkthrough-step {
+		display: flex;
+		gap: 20px;
+		align-items: flex-start;
+	}
+
+	.step-marker {
+		flex-shrink: 0;
+		padding-top: 2px;
+	}
+
+	.step-body {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.step-body h3 {
+		font-family: var(--font-display);
+		font-size: 1.1rem;
+		font-weight: 700;
+		margin-bottom: 6px;
+		letter-spacing: -0.02em;
+	}
+
+	.step-body > p {
+		color: var(--text-dim);
+		font-size: 0.92rem;
+		line-height: 1.6;
+		margin-bottom: 16px;
+	}
+
+	/* ---- Terminal pair (side by side) ---- */
+	.terminal-pair {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+	}
+
+	.terminal-sm {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.flow-arrow {
+		flex-shrink: 0;
+		opacity: 0.7;
+	}
+
+	/* ---- Terminal overrides ---- */
+	.line {
+		white-space: nowrap;
+		color: #e8e8e8;
+	}
+
+	.output {
+		color: #8892a4;
+	}
+
+	.prompt {
+		color: #6bcb77;
+		margin-right: 8px;
+	}
+
+	.code-highlight {
+		color: #ffd93d;
+		font-weight: 600;
+	}
+
+	.dim {
+		opacity: 0.5;
+	}
+
+	.typing-text {
+		color: #e8e8e8;
+	}
+
+	@keyframes blink {
+		50% { opacity: 0; }
+	}
+
+	.cursor {
+		color: #ff6b6b;
+		animation: blink 1s step-end infinite;
+	}
+
+	/* ---- App mockup (VS Code) ---- */
+	.app-mockup {
+		background: #1e1e2e;
+		border-radius: var(--radius);
+		overflow: hidden;
+		border: 1px solid rgba(255,255,255,0.08);
+	}
+
+	.app-bar {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 10px 14px;
+		background: #181825;
+		border-bottom: 1px solid rgba(255,255,255,0.06);
+	}
+
+	.app-title {
+		font-family: var(--font-mono);
+		font-size: 0.75rem;
+		color: #8892a4;
+	}
+
+	.app-body {
+		padding: 16px;
+		font-family: var(--font-mono);
+		font-size: 0.82rem;
+		line-height: 1.8;
+	}
+
+	.code-lines {
+		display: flex;
+		gap: 16px;
+		padding: 0 8px;
+		border-radius: 3px;
+	}
+
+	.code-lines.active-line {
+		background: rgba(255, 79, 56, 0.08);
+		border-left: 2px solid var(--accent-coral);
+		padding-left: 6px;
+	}
+
+	.line-num {
+		color: #585b70;
+		min-width: 24px;
+		text-align: right;
+		user-select: none;
+	}
+
+	.code-kw { color: #cba6f7; }
+	.code-fn { color: #89b4fa; }
+	.code-str { color: #a6e3a1; }
+
+	/* ---- Browser mockup ---- */
+	.browser-mockup {
+		background: #1e1e2e;
+		border-radius: var(--radius);
+		overflow: hidden;
+		border: 1px solid rgba(255,255,255,0.08);
+	}
+
+	.browser-bar {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 10px 14px;
+		background: #181825;
+		border-bottom: 1px solid rgba(255,255,255,0.06);
+	}
+
+	.browser-url {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		background: rgba(255,255,255,0.06);
+		padding: 5px 12px;
+		border-radius: 6px;
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		color: #8892a4;
+		flex: 1;
+		max-width: 360px;
+	}
+
+	.lock-icon {
+		color: #6bcb77;
+		flex-shrink: 0;
+	}
+
+	.browser-body {
+		padding: 24px;
+	}
+
+	.browser-body-terminal {
+		padding: 16px;
+		font-family: var(--font-mono);
+		font-size: 0.85rem;
+		line-height: 1.7;
+	}
+
+	.browser-session-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 16px;
+	}
+
+	.browser-logo {
+		font-family: var(--font-mono);
+		font-weight: 700;
+		font-size: 1rem;
+		color: #e8e8e8;
+	}
+
+	.browser-badge {
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		padding: 4px 12px;
+		border-radius: 50px;
+		font-weight: 600;
+	}
+
+	.browser-badge.connected {
+		background: rgba(77, 222, 122, 0.15);
+		color: #6bcb77;
+		border: 1px solid rgba(77, 222, 122, 0.3);
+	}
+
+	.browser-terminal {
+		background: rgba(0,0,0,0.3);
+		border-radius: var(--radius-sm);
+		padding: 16px;
+		font-family: var(--font-mono);
+		font-size: 0.85rem;
+		min-height: 48px;
+	}
+
+	.browser-status {
+		margin-top: 12px;
+		font-size: 0.75rem;
+		color: #585b70;
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.status-dot {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: #6bcb77;
+		box-shadow: 0 0 8px rgba(107, 203, 119, 0.5);
+	}
+
+	/* ---- Feature pills ---- */
+	.feature-pills {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		margin-top: 16px;
+	}
+
+	.pill {
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		color: var(--text-muted);
+		background: var(--bg-elevated);
+		border: 1px solid var(--border);
+		padding: 4px 12px;
+		border-radius: 50px;
+	}
+
+	.pill-badge {
+		color: var(--accent-amber);
+		border-color: rgba(232, 168, 48, 0.3);
+	}
+
+	/* ---- Responsive ---- */
+	@media (max-width: 768px) {
+		.terminal-pair {
+			flex-direction: column;
+		}
+
+		.flow-arrow {
+			transform: rotate(90deg);
+		}
+
+		.terminal-sm {
+			width: 100%;
+		}
+
+		.walkthrough-step {
+			flex-direction: column;
+			gap: 12px;
+		}
+	}
+
+	@media (max-width: 480px) {
+		.showcase-tabs {
+			gap: 6px;
+		}
+
+		.tab {
+			padding: 10px 16px;
+			font-size: 0.84rem;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.cursor {
+			animation: none;
+		}
+
+		.showcase-panel.active {
+			animation: none;
+		}
+	}
+</style>

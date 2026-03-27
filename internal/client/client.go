@@ -112,7 +112,30 @@ func New(relayURL string, sessionCode string) (*Client, error) {
 		done:          make(chan struct{}),
 	}
 
+	// Read incoming messages in the background to detect connection loss.
+	go c.readLoop()
+
 	return c, nil
+}
+
+// Done returns a channel that is closed when the connection is lost.
+func (c *Client) Done() <-chan struct{} {
+	return c.done
+}
+
+// readLoop reads and discards incoming messages until the connection closes.
+func (c *Client) readLoop() {
+	for {
+		if _, _, err := c.conn.ReadMessage(); err != nil {
+			select {
+			case <-c.done:
+				// Already closed
+			default:
+				close(c.done)
+			}
+			return
+		}
+	}
 }
 
 // SendInput encrypts and sends raw bytes as an input message to the relay.

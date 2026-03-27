@@ -1,10 +1,13 @@
 // ABOUTME: Cobra subcommand for `keytun join <session-code>`.
-// ABOUTME: Connects to a host's session and forwards local keystrokes.
+// ABOUTME: Connects to a host's session and forwards local keystrokes with auto-reconnect.
 package cmd
 
 import (
 	"fmt"
+	"math"
+	"math/rand"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gboston/keytun/internal/client"
@@ -21,69 +24,163 @@ var joinCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sessionCode := args[0]
 
-		c, err := client.New(joinRelayURL, sessionCode)
-		if err != nil {
-			return fmt.Errorf("failed to join session: %w", err)
-		}
-		defer c.Close()
+		const (
+			initialDelay = 500 * time.Millisecond
+			maxDelay     = 15 * time.Second
+			multiplier   = 2.0
+			jitter       = 0.25
+		)
 
-		fmt.Printf("Connected to %s\n", sessionCode)
-		fmt.Println("You are now typing into the remote terminal.")
-		fmt.Println("Press Escape twice to disconnect.")
-		fmt.Println()
+		attempt := 0
+		firstConnect := true
 
-		// Switch terminal to raw mode
-		oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
-		if err != nil {
-			return fmt.Errorf("failed to set raw mode: %w", err)
-		}
-		defer term.Restore(int(os.Stdin.Fd()), oldState)
-
-		// Read stdin and send to relay, watching for double-Escape to disconnect
-		esc := client.NewEscapeDetector(300 * time.Millisecond)
-		buf := make([]byte, 256)
 		for {
-			n, err := os.Stdin.Read(buf)
+			c, err := client.New(joinRelayURL, sessionCode)
 			if err != nil {
-				break
-			}
-			if n == 0 {
+				if isSessionGone(err) {
+					if firstConnect {
+						return fmt.Errorf("failed to join session: %w", err)
+					}
+					fmt.Fprintf(os.Stderr, "\r\n[keytun] session ended (host disconnected)\r\n")
+					return nil
+				}
+				attempt++
+				delay := backoffDelay(attempt, initialDelay, maxDelay, multiplier, jitter)
+				fmt.Fprintf(os.Stderr, "[keytun] connection failed, retrying in %s... (attempt %d)\n", delay.Round(time.Millisecond), attempt)
+				time.Sleep(delay)
 				continue
 			}
 
-			for i := 0; i < n; i++ {
-				action := esc.Feed(buf[i])
+			attempt = 0
+
+			if firstConnect {
+				fmt.Printf("Connected to %s\n", sessionCode)
+				fmt.Println("You are now typing into the remote terminal.")
+				fmt.Println("Press Escape twice to disconnect.")
+				fmt.Println()
+				firstConnect = false
+			} else {
+				fmt.Fprintf(os.Stderr, "\r\n[keytun] reconnected to %s\r\n", sessionCode)
+			}
+
+			reason := runInputLoop(c)
+			c.Close()
+
+			switch reason {
+			case loopDisconnect:
+				return nil
+			case loopConnectionLost:
+				attempt++
+				delay := backoffDelay(attempt, initialDelay, maxDelay, multiplier, jitter)
+				fmt.Fprintf(os.Stderr, "\r\n[keytun] connection lost, reconnecting in %s... (attempt %d)\r\n", delay.Round(time.Millisecond), attempt)
+				time.Sleep(delay)
+				continue
+			case loopStdinError:
+				return nil
+			}
+		}
+	},
+}
+
+type loopExitReason int
+
+const (
+	loopDisconnect    loopExitReason = iota // user pressed Esc×2
+	loopConnectionLost                      // send failed or connection closed
+	loopStdinError                          // stdin read error
+)
+
+// runInputLoop sets the terminal to raw mode and forwards stdin to the relay.
+// Returns the reason the loop exited.
+func runInputLoop(c *client.Client) loopExitReason {
+	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to set raw mode: %v\n", err)
+		return loopStdinError
+	}
+	defer term.Restore(int(os.Stdin.Fd()), oldState)
+
+	esc := client.NewEscapeDetector(300 * time.Millisecond)
+	buf := make([]byte, 256)
+
+	// Use a channel for stdin reads so we can select on connection loss
+	type stdinRead struct {
+		data []byte
+		err  error
+	}
+	stdinCh := make(chan stdinRead, 1)
+
+	go func() {
+		for {
+			n, err := os.Stdin.Read(buf)
+			if err != nil {
+				stdinCh <- stdinRead{nil, err}
+				return
+			}
+			if n > 0 {
+				copied := make([]byte, n)
+				copy(copied, buf[:n])
+				stdinCh <- stdinRead{copied, nil}
+			}
+		}
+	}()
+
+	for {
+		select {
+		case <-c.Done():
+			return loopConnectionLost
+
+		case read := <-stdinCh:
+			if read.err != nil {
+				return loopStdinError
+			}
+
+			for i := 0; i < len(read.data); i++ {
+				action := esc.Feed(read.data[i])
 				switch action {
 				case client.Disconnect:
 					term.Restore(int(os.Stdin.Fd()), oldState)
 					fmt.Println("\nDisconnected.")
-					return nil
+					return loopDisconnect
 				case client.EscapeHeld:
-					// Wait for possible second escape
 					continue
 				case client.PassThrough:
-					// If a previous escape timed out or was interrupted, flush it first
 					if esc.HadPendingEscape() {
 						if err := c.SendInput([]byte{0x1B}); err != nil {
-							return fmt.Errorf("send failed: %w", err)
+							return loopConnectionLost
 						}
 					}
-					if err := c.SendInput([]byte{buf[i]}); err != nil {
-						return fmt.Errorf("send failed: %w", err)
+					if err := c.SendInput([]byte{read.data[i]}); err != nil {
+						return loopConnectionLost
 					}
 				}
 			}
 
-			// After processing all bytes, flush any timed-out escape
 			if esc.Flush() {
 				if err := c.SendInput([]byte{0x1B}); err != nil {
-					return fmt.Errorf("send failed: %w", err)
+					return loopConnectionLost
 				}
 			}
 		}
+	}
+}
 
-		return nil
-	},
+// isSessionGone returns true if the error indicates the session no longer exists.
+func isSessionGone(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, "session not found") || strings.Contains(msg, "no such session")
+}
+
+// backoffDelay calculates an exponential backoff delay with jitter.
+func backoffDelay(attempt int, initial, max time.Duration, mult, jitterFrac float64) time.Duration {
+	delay := float64(initial) * math.Pow(mult, float64(attempt-1))
+	if delay > float64(max) {
+		delay = float64(max)
+	}
+	// Apply jitter: +/- jitterFrac
+	jitterRange := delay * jitterFrac
+	delay += (rand.Float64()*2 - 1) * jitterRange
+	return time.Duration(delay)
 }
 
 func init() {

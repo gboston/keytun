@@ -79,7 +79,6 @@ func runTerminalMode(code string) error {
 	if err != nil {
 		return fmt.Errorf("failed to set raw mode: %w", err)
 	}
-	defer term.Restore(int(os.Stdin.Fd()), oldState)
 
 	// Copy local stdin to PTY. Before a client joins, Ctrl+C (0x03) exits
 	// keytun cleanly instead of passing through to the PTY shell.
@@ -96,6 +95,10 @@ func runTerminalMode(code string) error {
 			// no client yet — check for Ctrl+C
 			for i := 0; i < n; i++ {
 				if buf[i] == 0x03 {
+					// Close host first so goroutines stop writing to stdout,
+					// then restore the terminal to avoid garbled output.
+					h.Close()
+					term.Restore(int(os.Stdin.Fd()), oldState)
 					return nil
 				}
 			}
@@ -105,6 +108,10 @@ func runTerminalMode(code string) error {
 		}
 	}
 
+	// Close host first so goroutines stop writing to stdout,
+	// then restore the terminal to avoid garbled output.
+	h.Close()
+	term.Restore(int(os.Stdin.Fd()), oldState)
 	return nil
 }
 

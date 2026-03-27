@@ -28,6 +28,7 @@ type Host struct {
 	cryptoSession    *crypto.Session
 	keyReady         chan struct{}
 	done             chan struct{}
+	wg               sync.WaitGroup
 	clientJoined     chan struct{}
 	clientJoinedOnce sync.Once
 	termCols         uint16
@@ -71,11 +72,13 @@ func New(relayURL string, sessionCode string, injector inject.Injector, localOut
 	// Only read output if the injector produces it (e.g. PTY mode)
 	if injector.HasOutput() {
 		if or, ok := injector.(inject.OutputReader); ok {
+			h.wg.Add(1)
 			go h.readOutput(or)
 		}
 	}
 
 	// Read messages from relay and deliver via injector
+	h.wg.Add(1)
 	go h.readRelayMessages()
 
 	return h, nil
@@ -112,7 +115,7 @@ func (h *Host) writeMessage(msgType int, data []byte) error {
 	return h.conn.WriteMessage(msgType, data)
 }
 
-// Close shuts down the host session.
+// Close shuts down the host session and waits for all goroutines to finish.
 func (h *Host) Close() {
 	select {
 	case <-h.done:
@@ -122,6 +125,7 @@ func (h *Host) Close() {
 	}
 	h.conn.Close()
 	h.injector.Close()
+	h.wg.Wait()
 }
 
 // Done returns a channel that is closed when the host session ends.
@@ -169,6 +173,8 @@ func (h *Host) sendEncryptedOutput(data []byte) {
 
 // readOutput reads from an OutputReader and forwards output to the relay and buffer.
 func (h *Host) readOutput(or inject.OutputReader) {
+	defer h.wg.Done()
+
 	// Wait for encryption key exchange before sending output to the relay.
 	select {
 	case <-h.keyReady:
@@ -219,6 +225,7 @@ func (h *Host) readOutput(or inject.OutputReader) {
 
 // readRelayMessages reads messages from the relay WebSocket and handles them.
 func (h *Host) readRelayMessages() {
+	defer h.wg.Done()
 	for {
 		select {
 		case <-h.done:

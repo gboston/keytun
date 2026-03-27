@@ -16,20 +16,32 @@ import Nav from '../../components/Nav.astro';
 				<div class="status-text" id="status-text">Initializing...</div>
 			</div>
 
-			<div class="terminal" id="terminal-wrapper" style="display: none;">
-				<div class="terminal-bar">
-					<div class="terminal-dots">
-						<span class="dot dot-red"></span>
-						<span class="dot dot-yellow"></span>
-						<span class="dot dot-green"></span>
-					</div>
-					<span class="terminal-title" id="terminal-title">keytun</span>
+			<div id="terminal-wrapper" style="display: none;">
+				<div class="session-header">
+					<span class="session-logo">keytun</span>
+					<span class="session-badge connected" id="session-badge">Connected</span>
 				</div>
-				<div id="terminal-container" class="terminal-xterm"></div>
-			</div>
 
-			<div class="hint" id="hint" style="display: none;">
-				Press <kbd>Esc</kbd> twice to disconnect
+				<div class="terminal">
+					<div class="terminal-bar">
+						<div class="terminal-dots">
+							<span class="dot dot-red"></span>
+							<span class="dot dot-yellow"></span>
+							<span class="dot dot-green"></span>
+						</div>
+						<span class="terminal-title" id="terminal-title">keytun</span>
+					</div>
+					<div id="terminal-container" class="terminal-xterm"></div>
+				</div>
+
+				<div class="session-status" id="session-status">
+					<span class="session-status-dot" id="session-status-dot"></span>
+					<span id="session-status-text"></span>
+				</div>
+
+				<div class="hint" id="hint">
+					Press <kbd>Esc</kbd> twice to disconnect
+				</div>
 			</div>
 
 			<div id="error-area" class="error-area" style="display: none;">
@@ -64,6 +76,9 @@ import Nav from '../../components/Nav.astro';
 		const hint = document.getElementById('hint')!;
 		const errorArea = document.getElementById('error-area')!;
 		const errorText = document.getElementById('error-text')!;
+		const sessionBadge = document.getElementById('session-badge')!;
+		const sessionStatusDot = document.getElementById('session-status-dot')!;
+		const sessionStatusText = document.getElementById('session-status-text')!;
 
 		function showStatus(text: string) {
 			statusArea.style.display = 'flex';
@@ -74,7 +89,6 @@ import Nav from '../../components/Nav.astro';
 		function showError(text: string) {
 			statusArea.style.display = 'none';
 			terminalWrapper.style.display = 'none';
-			hint.style.display = 'none';
 			errorArea.style.display = 'flex';
 			errorText.textContent = text;
 		}
@@ -82,7 +96,6 @@ import Nav from '../../components/Nav.astro';
 		function showTerminal() {
 			statusArea.style.display = 'none';
 			terminalWrapper.style.display = 'block';
-			hint.style.display = 'block';
 		}
 
 		async function main() {
@@ -130,6 +143,31 @@ import Nav from '../../components/Nav.astro';
 			client.onClose = () => {
 				term.write('\r\n\x1b[90m[disconnected]\x1b[0m\r\n');
 				hint.style.display = 'none';
+				sessionBadge.textContent = 'Disconnected';
+				sessionBadge.classList.remove('connected', 'reconnecting');
+				sessionBadge.classList.add('disconnected');
+				sessionStatusDot.classList.remove('reconnecting');
+				sessionStatusDot.classList.add('disconnected');
+			};
+
+			client.onReconnecting = (attempt: number, delayMs: number) => {
+				if (attempt === 1) {
+					term.write('\r\n\x1b[33m[reconnecting...]\x1b[0m\r\n');
+				}
+				sessionBadge.textContent = 'Reconnecting...';
+				sessionBadge.classList.remove('connected', 'disconnected');
+				sessionBadge.classList.add('reconnecting');
+				sessionStatusDot.classList.remove('disconnected');
+				sessionStatusDot.classList.add('reconnecting');
+			};
+
+			client.onReconnected = () => {
+				term.write('\x1b[32m[reconnected]\x1b[0m\r\n');
+				sessionBadge.textContent = 'Connected';
+				sessionBadge.classList.remove('disconnected', 'reconnecting');
+				sessionBadge.classList.add('connected');
+				sessionStatusDot.classList.remove('disconnected', 'reconnecting');
+				term.focus();
 			};
 
 			try {
@@ -142,6 +180,7 @@ import Nav from '../../components/Nav.astro';
 
 			// Connection established — show terminal
 			showTerminal();
+			sessionStatusText.textContent = `End-to-end encrypted \u00b7 Session ${sessionCode}`;
 			term.open(terminalContainer);
 			term.focus();
 
@@ -197,6 +236,77 @@ import Nav from '../../components/Nav.astro';
 	.join-container {
 		width: 100%;
 		max-width: 900px;
+	}
+
+	/* Session header */
+	.session-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 16px;
+	}
+
+	.session-logo {
+		font-family: var(--font-mono);
+		font-weight: 700;
+		font-size: 1rem;
+		color: var(--text);
+	}
+
+	.session-badge {
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		padding: 4px 12px;
+		border-radius: 50px;
+		font-weight: 600;
+	}
+
+	.session-badge.connected {
+		background: rgba(77, 222, 122, 0.15);
+		color: #6bcb77;
+		border: 1px solid rgba(77, 222, 122, 0.3);
+	}
+
+	.session-badge.disconnected {
+		background: rgba(232, 84, 78, 0.15);
+		color: var(--accent-coral);
+		border: 1px solid rgba(232, 84, 78, 0.3);
+	}
+
+	.session-badge.reconnecting {
+		background: rgba(255, 186, 48, 0.15);
+		color: var(--accent-amber);
+		border: 1px solid rgba(255, 186, 48, 0.3);
+	}
+
+	/* Session status line */
+	.session-status {
+		margin-top: 12px;
+		font-family: var(--font-mono);
+		font-size: 0.75rem;
+		color: var(--text-muted);
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.session-status-dot {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: #6bcb77;
+		box-shadow: 0 0 8px rgba(107, 203, 119, 0.5);
+		flex-shrink: 0;
+	}
+
+	.session-status-dot.disconnected {
+		background: var(--accent-coral);
+		box-shadow: 0 0 8px rgba(232, 84, 78, 0.5);
+	}
+
+	.session-status-dot.reconnecting {
+		background: var(--accent-amber);
+		box-shadow: 0 0 8px rgba(255, 186, 48, 0.5);
 	}
 
 	/* Status area */

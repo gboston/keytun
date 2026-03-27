@@ -86,6 +86,16 @@ export class KeytunClient {
     this.onPeerEvent = null;
     this.onError = null;
     this.onClose = null;
+    this.onEncrypted = null;
+    this.onReconnecting = null;
+    this.onReconnected = null;
+
+    // Reconnect state
+    this._intentionalClose = false;
+    this._reconnectAttempt = 0;
+    this._reconnectTimer = null;
+    this._initialReconnectDelay = 500;
+    this._maxReconnectDelay = 15000;
   }
 
   /**
@@ -115,6 +125,7 @@ export class KeytunClient {
     // Derive shared AES key
     const peerPubBytes = base64ToUint8(kxMsg.data);
     this._aesKey = await deriveSharedKey(keyPair.privateKey, peerPubBytes);
+    this.onEncrypted?.();
   }
 
   /**
@@ -130,6 +141,11 @@ export class KeytunClient {
    * Close the WebSocket connection.
    */
   disconnect() {
+    this._intentionalClose = true;
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
     if (this._ws) {
       this._ws.close();
     }
@@ -197,7 +213,11 @@ export class KeytunClient {
     };
 
     this._ws.onclose = () => {
-      if (this.onClose) this.onClose();
+      if (this._intentionalClose) {
+        this.onClose?.();
+      } else {
+        this._scheduleReconnect();
+      }
     };
   }
 
@@ -225,5 +245,63 @@ export class KeytunClient {
       this._ws.onopen = () => resolve();
       this._ws.onerror = (err) => reject(new Error('WebSocket connection failed'));
     });
+  }
+
+  _scheduleReconnect() {
+    if (this._intentionalClose) return;
+
+    this._reconnectAttempt++;
+    const base = Math.min(
+      this._initialReconnectDelay * Math.pow(2, this._reconnectAttempt - 1),
+      this._maxReconnectDelay,
+    );
+    const jitter = base * 0.25 * (Math.random() * 2 - 1);
+    const delay = Math.round(base + jitter);
+
+    this.onReconnecting?.(this._reconnectAttempt, delay);
+
+    this._reconnectTimer = setTimeout(() => this._attemptReconnect(), delay);
+  }
+
+  async _attemptReconnect() {
+    this._reconnectTimer = null;
+    this._aesKey = null;
+    this._messageWaiters = [];
+
+    try {
+      await this._openWebSocket();
+      this._setupMessageHandler();
+
+      this._sendJoin();
+      const joinAck = await this._waitForMessage('session_joined', HANDSHAKE_TIMEOUT_MS);
+      if (!joinAck) {
+        throw new Error('Timed out waiting for session confirmation');
+      }
+
+      const keyPair = await generateKeyPair();
+      this._sendKeyExchange(keyPair.publicKey);
+
+      const kxMsg = await this._waitForMessage('key_exchange', HANDSHAKE_TIMEOUT_MS);
+      if (!kxMsg) {
+        throw new Error('Timed out waiting for key exchange');
+      }
+
+      const peerPubBytes = base64ToUint8(kxMsg.data);
+      this._aesKey = await deriveSharedKey(keyPair.privateKey, peerPubBytes);
+
+      // Reconnect succeeded
+      this._reconnectAttempt = 0;
+      this.onEncrypted?.();
+      this.onReconnected?.();
+    } catch (err) {
+      // Check for non-retryable session-gone errors
+      if (err.message && (err.message.includes('session not found') || err.message.includes('no such session'))) {
+        this._intentionalClose = true;
+        this.onClose?.();
+        return;
+      }
+      // Retry
+      this._scheduleReconnect();
+    }
   }
 }
