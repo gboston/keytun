@@ -135,6 +135,21 @@ func (h *Host) ReadOutputUntil(target string, timeout time.Duration) string {
 	return h.outputBuf.String()
 }
 
+// sendEncryptedOutput encrypts data and sends it to the client as an output message.
+func (h *Host) sendEncryptedOutput(data []byte) {
+	encrypted, err := h.cryptoSession.Encrypt(data)
+	if err != nil {
+		return
+	}
+	encoded := base64.StdEncoding.EncodeToString(encrypted)
+	msg := protocol.Message{
+		Type: protocol.MsgOutput,
+		Data: encoded,
+	}
+	msgData, _ := json.Marshal(msg)
+	h.conn.WriteMessage(websocket.TextMessage, msgData)
+}
+
 // readOutput reads from an OutputReader and forwards output to the relay and buffer.
 func (h *Host) readOutput(or inject.OutputReader) {
 	// Wait for encryption key exchange before sending output to the relay.
@@ -215,6 +230,12 @@ func (h *Host) readRelayMessages() {
 				continue
 			}
 			h.injector.Inject(plaintext)
+
+			// In system mode there is no output stream, so echo input
+			// back to the client so they can see what they typed.
+			if !h.injector.HasOutput() {
+				h.sendEncryptedOutput(plaintext)
+			}
 		case protocol.MsgKeyExchange:
 			// Peer's public key — complete the ECDH key exchange
 			peerPub, err := base64.StdEncoding.DecodeString(msg.Data)
@@ -225,6 +246,13 @@ func (h *Host) readRelayMessages() {
 				continue
 			}
 			close(h.keyReady)
+
+			// In system mode, send a banner so the client knows they
+			// will only see echoed keystrokes, not application output.
+			if !h.injector.HasOutput() {
+				banner := "\x1b[90m[system mode — keystrokes are echoed, no application output]\x1b[0m\r\n"
+				h.sendEncryptedOutput([]byte(banner))
+			}
 		case protocol.MsgPeerEvent:
 			var banner string
 			if msg.Event == "joined" {

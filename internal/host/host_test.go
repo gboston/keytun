@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -72,6 +73,23 @@ func newPTYInjector(t *testing.T) *inject.PTYInjector {
 	t.Cleanup(func() { p.Close() })
 	return p
 }
+
+// noOutputInjector is a test injector that has no output stream,
+// simulating system mode behavior for echo testing.
+type noOutputInjector struct {
+	mu       sync.Mutex
+	injected []byte
+}
+
+func (n *noOutputInjector) Inject(data []byte) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.injected = append(n.injected, data...)
+	return nil
+}
+
+func (n *noOutputInjector) HasOutput() bool { return false }
+func (n *noOutputInjector) Close() error    { return nil }
 
 // simulateClientJoinWithKeyExchange joins a session as a raw WS client and
 // performs the encryption key exchange with the host. Returns the crypto
@@ -247,5 +265,113 @@ func TestHostSendsOutputToClient(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected client to receive output messages from host PTY")
+	}
+}
+
+func TestHostEchosInputWhenNoOutput(t *testing.T) {
+	server := setupRelay(t)
+	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+
+	inj := &noOutputInjector{}
+	h, err := New(relayURL, "test-echo-01", inj)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer h.Close()
+
+	// Simulate a client joining with key exchange
+	clientConn := dialWS(t, server)
+	defer clientConn.Close()
+	clientSess := simulateClientJoinWithKeyExchange(t, clientConn, "test-echo-01")
+
+	// Send encrypted input
+	plaintext := []byte("hello")
+	encrypted, err := clientSess.Encrypt(plaintext)
+	if err != nil {
+		t.Fatalf("encrypt: %v", err)
+	}
+	encoded := base64.StdEncoding.EncodeToString(encrypted)
+	sendMsg(t, clientConn, protocol.Message{
+		Type: protocol.MsgInput,
+		Data: encoded,
+	})
+
+	// Client should receive the echoed input as output
+	deadline := time.Now().Add(5 * time.Second)
+	var received []byte
+	for time.Now().Before(deadline) {
+		clientConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		_, data, err := clientConn.ReadMessage()
+		if err != nil {
+			break
+		}
+		var msg protocol.Message
+		json.Unmarshal(data, &msg)
+		if msg.Type == protocol.MsgOutput && msg.Data != "" {
+			ciphertext, _ := base64.StdEncoding.DecodeString(msg.Data)
+			decrypted, decErr := clientSess.Decrypt(ciphertext)
+			if decErr != nil {
+				t.Fatalf("failed to decrypt echoed output: %v", decErr)
+			}
+			received = append(received, decrypted...)
+			if strings.Contains(string(received), "hello") {
+				break
+			}
+		}
+	}
+	if !strings.Contains(string(received), "hello") {
+		t.Errorf("expected echoed input containing 'hello', got: %q", string(received))
+	}
+
+	// Verify the injector also received the input
+	inj.mu.Lock()
+	injected := string(inj.injected)
+	inj.mu.Unlock()
+	if !strings.Contains(injected, "hello") {
+		t.Errorf("expected injector to receive 'hello', got: %q", injected)
+	}
+}
+
+func TestHostSendsBannerWhenNoOutput(t *testing.T) {
+	server := setupRelay(t)
+	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+
+	inj := &noOutputInjector{}
+	h, err := New(relayURL, "test-echo-banner", inj)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer h.Close()
+
+	// Simulate a client joining with key exchange
+	clientConn := dialWS(t, server)
+	defer clientConn.Close()
+	clientSess := simulateClientJoinWithKeyExchange(t, clientConn, "test-echo-banner")
+
+	// Client should receive a banner message indicating system mode
+	deadline := time.Now().Add(5 * time.Second)
+	found := false
+	for time.Now().Before(deadline) {
+		clientConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		_, data, err := clientConn.ReadMessage()
+		if err != nil {
+			break
+		}
+		var msg protocol.Message
+		json.Unmarshal(data, &msg)
+		if msg.Type == protocol.MsgOutput && msg.Data != "" {
+			ciphertext, _ := base64.StdEncoding.DecodeString(msg.Data)
+			decrypted, decErr := clientSess.Decrypt(ciphertext)
+			if decErr != nil {
+				t.Fatalf("failed to decrypt banner: %v", decErr)
+			}
+			if strings.Contains(string(decrypted), "system mode") {
+				found = true
+				break
+			}
+		}
+	}
+	if !found {
+		t.Error("expected client to receive a system mode banner after key exchange")
 	}
 }
