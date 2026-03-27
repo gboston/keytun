@@ -8,7 +8,7 @@
 		<h2>How it works</h2>
 		<div class="architecture" id="arch-diagram">
 			<div class="arch-node">
-				<div class="arch-keycap">
+				<div class="arch-keycap arch-keycap-host">
 					<span>Host</span>
 				</div>
 				<p>Developer screensharing.<br />Runs <code>keytun host</code></p>
@@ -28,7 +28,7 @@
 				<span class="arrow-label">WebSocket</span>
 			</div>
 			<div class="arch-node">
-				<div class="arch-keycap">
+				<div class="arch-keycap arch-keycap-client">
 					<span>Client</span>
 				</div>
 				<p>Helper colleague.<br />Runs <code>keytun join &lt;code&gt;</code></p>
@@ -95,16 +95,28 @@
 		font-family: var(--font-mono);
 		font-weight: 600;
 		font-size: 0.9rem;
-		transition: transform 0.2s;
+		transition: transform 0.1s ease, box-shadow 0.1s ease;
 	}
 
 	.arch-keycap:hover {
-		transform: translateY(-2px);
+		transform: translateY(3px);
+		box-shadow: var(--keycap-shadow-pressed);
 	}
 
 	.arch-keycap-accent {
 		background: var(--gradient-primary);
 		color: var(--btn-primary-text);
+		box-shadow: var(--keycap-shadow), 0 0 40px rgba(255, 79, 56, 0.35), 0 0 80px rgba(255, 186, 48, 0.12);
+	}
+
+	[data-theme="dark"] .arch-keycap-host {
+		border: 1px solid rgba(62, 201, 245, 0.3);
+		box-shadow: var(--keycap-shadow), 0 0 28px rgba(62, 201, 245, 0.18);
+	}
+
+	[data-theme="dark"] .arch-keycap-client {
+		border: 1px solid rgba(77, 222, 122, 0.3);
+		box-shadow: var(--keycap-shadow), 0 0 28px rgba(77, 222, 122, 0.18);
 	}
 
 	.arch-node p {
@@ -125,7 +137,49 @@
 	.arrow-line {
 		width: 60px;
 		height: 2px;
-		background: linear-gradient(90deg, transparent, var(--text-muted), transparent);
+		position: relative;
+		background: rgba(255,255,255,0.06);
+		opacity: 1;
+		overflow: visible;
+	}
+
+	/* Keystrokes: client → relay → host (left to right) */
+	.arrow-line::after {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: -20px;
+		width: 20px;
+		height: 2px;
+		background: linear-gradient(90deg, transparent, var(--accent-coral), var(--accent-amber));
+		animation: flow-fwd 1.6s linear infinite;
+		border-radius: 1px;
+		box-shadow: 0 0 6px var(--accent-coral);
+	}
+
+	/* Output: host → relay → client (right to left) */
+	.arrow-line::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		right: -20px;
+		width: 20px;
+		height: 2px;
+		background: linear-gradient(270deg, transparent, var(--accent-mint), var(--accent-sky));
+		animation: flow-back 1.6s linear infinite;
+		animation-delay: 0.8s;
+		border-radius: 1px;
+		box-shadow: 0 0 6px var(--accent-mint);
+	}
+
+	@keyframes flow-fwd {
+		from { left: -20px; }
+		to   { left: 60px;  }
+	}
+
+	@keyframes flow-back {
+		from { right: -20px; }
+		to   { right: 60px;  }
 	}
 
 	.arrow-label {

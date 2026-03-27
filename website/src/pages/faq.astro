@@ -1,0 +1,240 @@
+---
+// ABOUTME: Frequently asked questions page for keytun.
+// ABOUTME: Collapsible Q&A grouped by category: security, usage, and technical.
+import Layout from '../layouts/Layout.astro';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<Layout title="FAQ — keytun" description="Frequently asked questions about keytun — security, usage, and technical details.">
+	<Nav />
+	<main id="main-content" class="faq-page">
+		<div class="container">
+			<h1>Frequently asked questions</h1>
+
+			<div class="faq-group">
+				<h2 class="faq-category">
+					<span class="faq-category-icon" aria-hidden="true">🔒</span>
+					Security
+				</h2>
+
+				<details class="faq-item">
+					<summary>Is keytun safe? Can the relay see my keystrokes?</summary>
+					<div class="faq-answer">
+						<p>Keytun uses end-to-end encryption (X25519 key exchange + AES-256-GCM). The relay server is a dumb pipe — it only ever sees ciphertext. Even if you use the public relay at <code>relay.keytun.com</code>, your keystrokes and terminal output are never visible to the relay operator.</p>
+					</div>
+				</details>
+
+				<details class="faq-item">
+					<summary>Can I self-host the relay?</summary>
+					<div class="faq-answer">
+						<p>Yes. The relay is a stateless WebSocket broker with no database or persistence. Run <code>keytun relay --port 8080</code> on any server, or deploy the Docker image to Fly.io, Railway, or any container host. Then pass <code>--relay ws://your-server:8080/ws</code> when hosting or joining.</p>
+					</div>
+				</details>
+
+				<details class="faq-item">
+					<summary>Who can join my session?</summary>
+					<div class="faq-answer">
+						<p>Anyone with your session code. Session codes are randomly generated from a wordlist (e.g. <code>keen-fox-42</code>) and are unguessable. Sessions are ephemeral — they exist only in memory while the host is connected. Once the host disconnects, the session is gone.</p>
+					</div>
+				</details>
+			</div>
+
+			<div class="faq-group">
+				<h2 class="faq-category">
+					<span class="faq-category-icon" aria-hidden="true">⌨</span>
+					Usage
+				</h2>
+
+				<details class="faq-item">
+					<summary>Does my colleague need to install keytun?</summary>
+					<div class="faq-answer">
+						<p>No. They can <a href="/join">join straight from the browser</a> — no install needed. You can also share a direct link like <code>keytun.com/s/keen-fox-42</code>. If they prefer a native experience, they can install keytun and use <code>keytun join &lt;code&gt;</code>.</p>
+					</div>
+				</details>
+
+				<details class="faq-item">
+					<summary>Do arrow keys, tab completion, and Ctrl+C work?</summary>
+					<div class="faq-answer">
+						<p>Yes. In terminal mode, keytun spawns a real PTY (pseudo-terminal). Raw key bytes are sent — arrow keys, tab completion, Ctrl+C, Ctrl+D, and other control sequences all work exactly as they would locally.</p>
+					</div>
+				</details>
+
+				<details class="faq-item">
+					<summary>How do I disconnect?</summary>
+					<div class="faq-answer">
+						<p>Press <code>Esc</code> twice in quick succession. Both the host and client will be notified of the disconnect. The host can also just close their terminal or press Ctrl+C.</p>
+					</div>
+				</details>
+
+				<details class="faq-item">
+					<summary>What's the difference between terminal mode and system mode?</summary>
+					<div class="faq-answer">
+						<p><strong>Terminal mode</strong> (default) spawns a PTY — your colleague types into a real shell session. Use this for running commands together, debugging, pair programming in the terminal.</p>
+						<p><strong>System mode</strong> injects keystrokes at the OS level into any application. Use <code>keytun host --mode system</code> to target the focused window, or <code>--target "VS Code"</code> to target a specific app. Currently macOS only.</p>
+					</div>
+				</details>
+			</div>
+
+			<div class="faq-group">
+				<h2 class="faq-category">
+					<span class="faq-category-icon" aria-hidden="true">🔧</span>
+					Technical
+				</h2>
+
+				<details class="faq-item">
+					<summary>What platforms does keytun support?</summary>
+					<div class="faq-answer">
+						<p>keytun runs on macOS, Linux, and Windows. Terminal mode works on all three. System mode (OS-level keystroke injection) is currently macOS only, with Linux support planned.</p>
+					</div>
+				</details>
+
+				<details class="faq-item">
+					<summary>Can multiple clients join the same session?</summary>
+					<div class="faq-answer">
+						<p>Currently, each session supports one host and one client. Multi-client sessions are not yet supported but may be added in the future.</p>
+					</div>
+				</details>
+
+				<details class="faq-item">
+					<summary>What happens if the connection drops?</summary>
+					<div class="faq-answer">
+						<p>Both sides are notified immediately via a peer disconnect event. The host's shell session is unaffected — it keeps running. The client can rejoin using the same session code as long as the host is still connected.</p>
+					</div>
+				</details>
+
+				<details class="faq-item">
+					<summary>How is keytun different from tmux/tmate or VS Code Live Share?</summary>
+					<div class="faq-answer">
+						<p>Those tools are great for full pair programming sessions. Keytun solves a narrower problem: you're already screensharing and your colleague just needs to type one command. No shared editor setup, no tmux session, no account creation — just a session code and they're typing.</p>
+					</div>
+				</details>
+
+				<details class="faq-item">
+					<summary>Is keytun open source?</summary>
+					<div class="faq-answer">
+						<p>Yes. Keytun is licensed under AGPL v3 and the source is on <a href="https://github.com/gboston/keytun">GitHub</a>. Contributions are welcome.</p>
+					</div>
+				</details>
+			</div>
+		</div>
+	</main>
+	<Footer />
+</Layout>
+
+<style>
+	.faq-page {
+		padding: 120px 0 80px;
+		min-height: 100vh;
+	}
+
+	.faq-page .container {
+		max-width: 720px;
+	}
+
+	.faq-page h1 {
+		font-family: var(--font-display);
+		font-size: clamp(1.8rem, 4vw, 2.4rem);
+		font-weight: 700;
+		letter-spacing: -0.03em;
+		margin-bottom: 48px;
+	}
+
+	/* Category groups */
+	.faq-group {
+		margin-bottom: 40px;
+	}
+
+	.faq-category {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		font-family: var(--font-display);
+		font-size: 1.1rem;
+		font-weight: 700;
+		letter-spacing: -0.02em;
+		color: var(--text);
+		margin-bottom: 16px;
+		padding-bottom: 12px;
+		border-bottom: 1px solid var(--border);
+	}
+
+	.faq-category-icon {
+		font-size: 1.2rem;
+	}
+
+	/* Individual FAQ item */
+	.faq-item {
+		border-bottom: 1px solid var(--border);
+	}
+
+	.faq-item summary {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 16px;
+		padding: 16px 0;
+		font-size: 0.95rem;
+		font-weight: 600;
+		color: var(--text);
+		cursor: pointer;
+		list-style: none;
+		transition: color 0.15s;
+	}
+
+	/* Remove default marker */
+	.faq-item summary::-webkit-details-marker {
+		display: none;
+	}
+
+	.faq-item summary::marker {
+		content: '';
+	}
+
+	/* Chevron indicator */
+	.faq-item summary::after {
+		content: '+';
+		font-family: var(--font-mono);
+		font-size: 1.1rem;
+		font-weight: 400;
+		color: var(--text-muted);
+		flex-shrink: 0;
+		transition: transform 0.2s, color 0.2s;
+	}
+
+	.faq-item[open] summary::after {
+		content: '−';
+		color: var(--accent-peach);
+	}
+
+	.faq-item summary:hover {
+		color: var(--accent-peach);
+	}
+
+	/* Answer content */
+	.faq-answer {
+		padding: 0 0 20px;
+	}
+
+	.faq-answer p {
+		font-size: 0.9rem;
+		line-height: 1.7;
+		color: var(--text-dim);
+		margin-bottom: 10px;
+	}
+
+	.faq-answer p:last-child {
+		margin-bottom: 0;
+	}
+
+	.faq-answer strong {
+		color: var(--text);
+		font-weight: 600;
+	}
+
+	@media (max-width: 480px) {
+		.faq-page {
+			padding: 100px 0 60px;
+		}
+	}
+</style>

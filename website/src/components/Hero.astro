@@ -6,6 +6,7 @@ import TerminalDemo from './TerminalDemo.astro';
 ---
 
 <section class="hero">
+	<div class="hero-glow" aria-hidden="true"></div>
 	<div class="hero-badge hero-anim" style="--delay: 0">Think ngrok, but for keystrokes</div>
 	<h1 class="hero-anim" style="--delay: 1">
 		Let your colleague<br />
@@ -32,6 +33,19 @@ import TerminalDemo from './TerminalDemo.astro';
 		text-align: center;
 		max-width: 1100px;
 		margin: 0 auto;
+		position: relative;
+	}
+
+	.hero-glow {
+		position: absolute;
+		top: 40px;
+		left: 50%;
+		transform: translateX(-50%);
+		width: 900px;
+		height: 600px;
+		background: radial-gradient(ellipse at 50% 30%, rgba(255, 79, 56, 0.13) 0%, rgba(255, 186, 48, 0.06) 45%, transparent 70%);
+		pointer-events: none;
+		z-index: 0;
 	}
 
 	.hero-badge {
@@ -44,14 +58,27 @@ import TerminalDemo from './TerminalDemo.astro';
 		padding: 6px 18px;
 		border-radius: 50px;
 		margin-bottom: 28px;
+		position: relative;
+		z-index: 1;
+	}
+
+	:global([data-theme="dark"]) .hero-badge {
+		box-shadow: 0 0 16px rgba(255, 79, 56, 0.18), 0 0 0 1px rgba(255, 79, 56, 0.08) inset;
+	}
+
+	:global([data-theme="dark"]) .hero-glow {
+		background: radial-gradient(ellipse at 50% 30%, rgba(255, 79, 56, 0.20) 0%, rgba(255, 186, 48, 0.10) 45%, transparent 70%);
 	}
 
 	.hero h1 {
+		font-family: var(--font-display);
 		font-size: clamp(2.4rem, 6vw, 4rem);
 		font-weight: 700;
 		line-height: 1.15;
 		margin-bottom: 24px;
-		letter-spacing: -0.02em;
+		letter-spacing: -0.03em;
+		position: relative;
+		z-index: 1;
 	}
 
 	.gradient-text {
@@ -74,7 +101,7 @@ import TerminalDemo from './TerminalDemo.astro';
 		gap: 16px;
 		justify-content: center;
 		flex-wrap: wrap;
-		margin-bottom: 64px;
+		margin-bottom: 40px;
 	}
 
 	@media (max-width: 768px) {
@@ -87,7 +114,7 @@ import TerminalDemo from './TerminalDemo.astro';
 		opacity: 0;
 		transform: translateY(20px);
 		animation: hero-fade-in 0.6s ease-out forwards;
-		animation-delay: calc(var(--delay) * 0.12s + 0.1s);
+		animation-delay: calc(var(--delay) * 0.15s + 0.1s);
 	}
 
 	@keyframes hero-fade-in {

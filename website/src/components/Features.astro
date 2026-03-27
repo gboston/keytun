@@ -1,39 +1,42 @@
 ---
 // ABOUTME: Feature grid showcasing keytun's developer-focused qualities.
-// ABOUTME: Six cards with keycap-styled icons for single binary, session codes, etc.
+// ABOUTME: Six cards with keycap-styled icons, each with a distinct accent color.
 ---
 
 <section class="section" id="features">
 	<div class="container">
 		<h2>Built for developers</h2>
 		<div class="features-grid">
-			<div class="feature">
-				<div class="keycap-small feature-icon">⚡</div>
+			<div class="feature" style="--card-accent: var(--accent-amber); --card-accent-rgb: 255, 186, 48;">
+				<div class="keycap-small feature-icon" aria-hidden="true">⚡</div>
 				<h3>Single binary</h3>
 				<p>Go binary. No runtime, no dependencies. Download and run.</p>
 			</div>
-			<div class="feature">
-				<div class="keycap-small feature-icon">🔑</div>
+			<div class="feature" style="--card-accent: var(--accent-peach); --card-accent-rgb: 255, 126, 82;">
+				<div class="keycap-small feature-icon" aria-hidden="true">🔑</div>
 				<h3>Readable session codes</h3>
 				<p>Wordlist-based codes like <code>keen-fox-42</code>. Easy to say over a call.</p>
 			</div>
-			<div class="feature">
-				<div class="keycap-small feature-icon">🔒</div>
-				<h3>End-to-end encrypted</h3>
+			<div class="feature feature-highlight" style="--card-accent: var(--accent-mint); --card-accent-rgb: 77, 222, 122;">
+				<div class="keycap-small feature-icon" aria-hidden="true">🔒</div>
+				<div class="feature-title-row">
+					<h3>End-to-end encrypted</h3>
+					<span class="feature-badge">E2EE</span>
+				</div>
 				<p>X25519 key exchange + AES-256-GCM. The relay is a dumb pipe — it never sees your keystrokes or output.</p>
 			</div>
-			<div class="feature">
-				<div class="keycap-small feature-icon">☁️</div>
+			<div class="feature" style="--card-accent: var(--accent-sky); --card-accent-rgb: 62, 201, 245;">
+				<div class="keycap-small feature-icon" aria-hidden="true">☁️</div>
 				<h3>Self-hostable relay</h3>
 				<p>Stateless WebSocket broker. Deploy on Fly.io, Railway, or any container host.</p>
 			</div>
-			<div class="feature">
-				<div class="keycap-small feature-icon">🌐</div>
+			<div class="feature" style="--card-accent: var(--accent-lavender); --card-accent-rgb: 176, 140, 255;">
+				<div class="keycap-small feature-icon" aria-hidden="true">🌐</div>
 				<h3>Browser client</h3>
 				<p>Your colleague doesn't need to install anything. Share a link and they <a href="/join">join straight from the browser</a>.</p>
 			</div>
-			<div class="feature">
-				<div class="keycap-small feature-icon">🪶</div>
+			<div class="feature" style="--card-accent: var(--accent-coral); --card-accent-rgb: 255, 79, 56;">
+				<div class="keycap-small feature-icon" aria-hidden="true">🪶</div>
 				<h3>Lightweight</h3>
 				<p>No database, no auth tokens, no persistence. Sessions live in memory.</p>
 			</div>
@@ -56,16 +59,96 @@
 		padding: 28px 24px;
 		display: flex;
 		flex-direction: column;
+		position: relative;
+		overflow: hidden;
+		transition: border-color 0.25s, box-shadow 0.25s, transform 0.25s;
+	}
+
+	/* Subtle top accent line */
+	.feature::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 2px;
+		background: var(--card-accent);
+		opacity: 0;
+		transition: opacity 0.25s;
+	}
+
+	.feature:hover::before {
+		opacity: 0.7;
+	}
+
+	.feature:hover {
+		border-color: rgba(var(--card-accent-rgb), 0.22);
+		box-shadow:
+			0 0 0 1px rgba(var(--card-accent-rgb), 0.06),
+			0 12px 40px rgba(0, 0, 0, 0.28),
+			0 0 32px rgba(var(--card-accent-rgb), 0.09);
+		transform: translateY(-3px);
+	}
+
+	/* Highlighted card (encryption) */
+	.feature-highlight {
+		border-color: rgba(var(--card-accent-rgb), 0.15);
+	}
+
+	[data-theme="dark"] .feature-highlight {
+		background: linear-gradient(135deg, var(--bg-card), rgba(var(--card-accent-rgb), 0.04));
+	}
+
+	.feature-title-row {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		margin-bottom: 8px;
+	}
+
+	.feature-title-row h3 {
+		margin-bottom: 0;
+	}
+
+	.feature-badge {
+		font-family: var(--font-mono);
+		font-size: 0.62rem;
+		font-weight: 600;
+		letter-spacing: 0.1em;
+		color: var(--accent-mint);
+		background: rgba(77, 222, 122, 0.08);
+		border: 1px solid rgba(77, 222, 122, 0.2);
+		padding: 2px 7px;
+		border-radius: 4px;
+		flex-shrink: 0;
+	}
+
+	[data-theme="dark"] .feature-badge {
+		background: rgba(77, 222, 122, 0.1);
+		border-color: rgba(77, 222, 122, 0.25);
+		box-shadow: 0 0 10px rgba(77, 222, 122, 0.15);
 	}
 
 	.feature-icon {
 		margin-bottom: 16px;
 	}
 
+	/* Icon always tinted to card accent */
+	.feature .keycap-small {
+		background: rgba(var(--card-accent-rgb), 0.1);
+		color: var(--card-accent);
+	}
+
+	.feature:hover .keycap-small {
+		background: rgba(var(--card-accent-rgb), 0.18);
+		box-shadow: var(--keycap-shadow-sm), 0 0 10px rgba(var(--card-accent-rgb), 0.2);
+	}
+
 	.feature h3 {
 		font-size: 1.05rem;
 		margin-bottom: 8px;
 		font-weight: 600;
+		line-height: 1.3;
 	}
 
 	.feature p {

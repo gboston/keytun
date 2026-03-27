@@ -4,42 +4,62 @@
 ---
 
 <footer>
+	<div class="footer-glow" aria-hidden="true"></div>
 	<div class="container footer-inner">
-		<div class="footer-logo">
-			<span class="logo-key">⌨</span> keytun
-		</div>
+		<div class="footer-logo">keytun</div>
 		<p>Lightweight keyboard tunnel for developers.</p>
 		<div class="footer-links">
 			<a href="https://github.com/gboston/keytun">GitHub</a>
-			<span class="footer-sep">·</span>
+			<span class="footer-sep" aria-hidden="true">·</span>
 			<a href="https://github.com/gboston/keytun/issues">Issues</a>
-			<span class="footer-sep">·</span>
+			<span class="footer-sep" aria-hidden="true">·</span>
 			<a href="https://github.com/gboston/keytun/releases">Releases</a>
 		</div>
+		<p class="footer-copy">Open source · AGPL v3</p>
 	</div>
 </footer>
 
 <style>
 	footer {
 		border-top: 1px solid var(--border);
-		padding: 48px 0;
+		padding: 56px 0 48px;
+		position: relative;
+		overflow: hidden;
+		background: var(--bg-surface);
+	}
+
+	.footer-glow {
+		position: absolute;
+		bottom: -60px;
+		left: 50%;
+		transform: translateX(-50%);
+		width: 500px;
+		height: 200px;
+		background: radial-gradient(ellipse at center, rgba(255, 79, 56, 0.07) 0%, transparent 70%);
+		pointer-events: none;
 	}
 
 	.footer-inner {
 		text-align: center;
+		position: relative;
 	}
 
 	.footer-logo {
-		font-family: var(--font-mono);
-		font-size: 1.1rem;
-		font-weight: 600;
-		margin-bottom: 8px;
+		font-family: var(--font-display);
+		font-size: 1.3rem;
+		font-weight: 700;
+		margin-bottom: 10px;
+		letter-spacing: -0.02em;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
 	}
 
-	.footer-inner > p {
+.footer-inner > p {
 		color: var(--text-muted);
 		font-size: 0.88rem;
-		margin-bottom: 16px;
+		margin-bottom: 20px;
 	}
 
 	.footer-links {
@@ -47,14 +67,27 @@
 		gap: 8px;
 		justify-content: center;
 		align-items: center;
+		margin-bottom: 20px;
 	}
 
 	.footer-links a {
 		color: var(--text-dim);
 		font-size: 0.88rem;
+		transition: color 0.2s;
+	}
+
+	.footer-links a:hover {
+		color: var(--accent-coral);
 	}
 
 	.footer-sep {
 		color: var(--text-muted);
+	}
+
+	.footer-copy {
+		font-size: 0.78rem;
+		color: var(--text-muted);
+		font-family: var(--font-mono);
+		margin-bottom: 0 !important;
 	}
 </style>

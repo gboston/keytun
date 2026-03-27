@@ -158,6 +158,12 @@
 		}
 	}
 
+	@media (prefers-reduced-motion: reduce) {
+		.terminal-body .cursor {
+			animation: none;
+		}
+	}
+
 	@media (max-width: 480px) {
 		.terminal-wrap {
 			margin: 0 -16px;
