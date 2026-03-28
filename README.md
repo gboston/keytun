@@ -21,15 +21,37 @@
 
 ---
 
-```
-Client (stdin) ──WS──▶ Relay (broker) ──WS──▶ Host (PTY)
-                       ◀──────────────────────  (output back to client)
+```mermaid
+sequenceDiagram
+    participant H as Host (PTY)
+    participant R as Relay (broker)
+    participant C as Client (stdin)
+
+    Note over H,C: Session Setup
+    H->>R: host_register {session: "keen-fox-42"}
+    C->>R: client_join {session: "keen-fox-42"}
+    R->>C: session_joined
+    R->>H: peer_event {joined}
+
+    Note over H,C: E2E Key Exchange (X25519 ECDH)
+    C->>R: key_exchange {clientPubKey}
+    R->>H: key_exchange {clientPubKey}
+    H->>R: key_exchange {hostPubKey}
+    R->>C: key_exchange {hostPubKey}
+    Note over H,C: Both derive AES-256-GCM key via HKDF-SHA256
+
+    Note over H,C: Encrypted I/O (relay sees only ciphertext)
+    C->>R: input {AES-GCM(keystroke)}
+    R->>H: input {AES-GCM(keystroke)}
+    H->>H: Write to PTY
+    H->>R: output {AES-GCM(terminal output)}
+    R->>C: output {AES-GCM(terminal output)}
 ```
 
 1. The **host** starts a session and gets a human-readable code (e.g. `keen-fox-42`)
 2. The **client** joins using that code
 3. Keystrokes flow through the relay to the host's terminal, output flows back
-4. All data is encrypted end-to-end using X25519 key exchange + AES-256-GCM
+4. All data is encrypted end-to-end — the relay is a dumb pipe that cannot read keystrokes or terminal output
 
 ## Install
 

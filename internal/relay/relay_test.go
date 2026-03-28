@@ -232,15 +232,21 @@ func TestClientDisconnectSendsPeerEvent(t *testing.T) {
 	})
 
 	// Read peer_event "joined"
-	readMsg(t, host)
+	joinMsg := readMsg(t, host)
+	if joinMsg.ClientID == "" {
+		t.Error("peer_event joined should include a ClientID")
+	}
 
 	// Client disconnects
 	client.Close()
 
-	// Host should get peer_event "left"
+	// Host should get peer_event "left" with the same ClientID
 	msg := readMsg(t, host)
 	if msg.Type != protocol.MsgPeerEvent || msg.Event != "left" {
 		t.Errorf("expected peer_event left, got %+v", msg)
+	}
+	if msg.ClientID != joinMsg.ClientID {
+		t.Errorf("left ClientID = %q, want %q", msg.ClientID, joinMsg.ClientID)
 	}
 }
 
@@ -564,6 +570,272 @@ func TestSweepStaleLimiters(t *testing.T) {
 	}
 }
 
+func TestMultipleClientsJoinSameSession(t *testing.T) {
+	server, _ := newTestServer(t)
+
+	host := dialWS(t, server)
+	defer host.Close()
+	sendMsg(t, host, protocol.Message{
+		Type:    protocol.MsgHostRegister,
+		Session: "test-multi-01",
+	})
+
+	// Client A joins
+	clientA := dialWS(t, server)
+	defer clientA.Close()
+	sendMsg(t, clientA, protocol.Message{
+		Type:    protocol.MsgClientJoin,
+		Session: "test-multi-01",
+	})
+
+	// Host should get peer_event with a ClientID
+	msgA := readMsg(t, host)
+	if msgA.Type != protocol.MsgPeerEvent || msgA.Event != "joined" {
+		t.Fatalf("expected peer_event joined for client A, got %+v", msgA)
+	}
+	if msgA.ClientID == "" {
+		t.Fatal("peer_event for client A should have a ClientID")
+	}
+
+	// Client B joins
+	clientB := dialWS(t, server)
+	defer clientB.Close()
+	sendMsg(t, clientB, protocol.Message{
+		Type:    protocol.MsgClientJoin,
+		Session: "test-multi-01",
+	})
+
+	// Host should get peer_event with a different ClientID
+	msgB := readMsg(t, host)
+	if msgB.Type != protocol.MsgPeerEvent || msgB.Event != "joined" {
+		t.Fatalf("expected peer_event joined for client B, got %+v", msgB)
+	}
+	if msgB.ClientID == "" {
+		t.Fatal("peer_event for client B should have a ClientID")
+	}
+	if msgA.ClientID == msgB.ClientID {
+		t.Errorf("client IDs should be different: both are %q", msgA.ClientID)
+	}
+}
+
+func TestInputRoutedWithClientID(t *testing.T) {
+	server, _ := newTestServer(t)
+
+	host := dialWS(t, server)
+	defer host.Close()
+	sendMsg(t, host, protocol.Message{
+		Type:    protocol.MsgHostRegister,
+		Session: "test-multi-02",
+	})
+
+	// Two clients join
+	clientA := dialWS(t, server)
+	defer clientA.Close()
+	sendMsg(t, clientA, protocol.Message{
+		Type:    protocol.MsgClientJoin,
+		Session: "test-multi-02",
+	})
+	peerA := readMsg(t, host)
+	idA := peerA.ClientID
+
+	clientB := dialWS(t, server)
+	defer clientB.Close()
+	sendMsg(t, clientB, protocol.Message{
+		Type:    protocol.MsgClientJoin,
+		Session: "test-multi-02",
+	})
+	peerB := readMsg(t, host)
+	idB := peerB.ClientID
+
+	// Client A sends input
+	sendMsg(t, clientA, protocol.Message{
+		Type: protocol.MsgInput,
+		Data: "ZnJvbUE=",
+	})
+	msgFromA := readMsg(t, host)
+	if msgFromA.ClientID != idA {
+		t.Errorf("input from A: ClientID = %q, want %q", msgFromA.ClientID, idA)
+	}
+
+	// Client B sends input
+	sendMsg(t, clientB, protocol.Message{
+		Type: protocol.MsgInput,
+		Data: "ZnJvbUI=",
+	})
+	msgFromB := readMsg(t, host)
+	if msgFromB.ClientID != idB {
+		t.Errorf("input from B: ClientID = %q, want %q", msgFromB.ClientID, idB)
+	}
+}
+
+func TestTargetedOutputRoutesToSpecificClient(t *testing.T) {
+	server, _ := newTestServer(t)
+
+	host := dialWS(t, server)
+	defer host.Close()
+	sendMsg(t, host, protocol.Message{
+		Type:    protocol.MsgHostRegister,
+		Session: "test-multi-03",
+	})
+
+	clientA := dialWS(t, server)
+	defer clientA.Close()
+	sendMsg(t, clientA, protocol.Message{
+		Type:    protocol.MsgClientJoin,
+		Session: "test-multi-03",
+	})
+	peerA := readMsg(t, host)
+	idA := peerA.ClientID
+	readMsg(t, clientA) // session_joined
+
+	clientB := dialWS(t, server)
+	defer clientB.Close()
+	sendMsg(t, clientB, protocol.Message{
+		Type:    protocol.MsgClientJoin,
+		Session: "test-multi-03",
+	})
+	readMsg(t, host) // peer_event for B
+	readMsg(t, clientB) // session_joined
+
+	// Host sends output targeted to client A only
+	sendMsg(t, host, protocol.Message{
+		Type:     protocol.MsgOutput,
+		Data:     "Zm9yQQ==",
+		ClientID: idA,
+	})
+
+	// Client A should receive it
+	msgA := readMsg(t, clientA)
+	if msgA.Type != protocol.MsgOutput || msgA.Data != "Zm9yQQ==" {
+		t.Errorf("client A expected targeted output, got %+v", msgA)
+	}
+
+	// Client B should NOT receive it (set a short deadline)
+	clientB.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+	_, _, err := clientB.ReadMessage()
+	if err == nil {
+		t.Error("client B should NOT have received the targeted output")
+	}
+}
+
+func TestBroadcastOutputRoutesToAllClients(t *testing.T) {
+	server, _ := newTestServer(t)
+
+	host := dialWS(t, server)
+	defer host.Close()
+	sendMsg(t, host, protocol.Message{
+		Type:    protocol.MsgHostRegister,
+		Session: "test-multi-04",
+	})
+
+	clientA := dialWS(t, server)
+	defer clientA.Close()
+	sendMsg(t, clientA, protocol.Message{
+		Type:    protocol.MsgClientJoin,
+		Session: "test-multi-04",
+	})
+	readMsg(t, host)    // peer_event
+	readMsg(t, clientA) // session_joined
+
+	clientB := dialWS(t, server)
+	defer clientB.Close()
+	sendMsg(t, clientB, protocol.Message{
+		Type:    protocol.MsgClientJoin,
+		Session: "test-multi-04",
+	})
+	readMsg(t, host)    // peer_event
+	readMsg(t, clientB) // session_joined
+
+	// Host sends resize (no ClientID = broadcast)
+	sendMsg(t, host, protocol.Message{
+		Type: protocol.MsgResize,
+		Cols: 120,
+		Rows: 40,
+	})
+
+	// Both clients should receive it
+	msgA := readMsg(t, clientA)
+	if msgA.Type != protocol.MsgResize || msgA.Cols != 120 {
+		t.Errorf("client A expected resize, got %+v", msgA)
+	}
+	msgB := readMsg(t, clientB)
+	if msgB.Type != protocol.MsgResize || msgB.Cols != 120 {
+		t.Errorf("client B expected resize, got %+v", msgB)
+	}
+}
+
+func TestClientDisconnectSendsClientIDInPeerEvent(t *testing.T) {
+	server, _ := newTestServer(t)
+
+	host := dialWS(t, server)
+	defer host.Close()
+	sendMsg(t, host, protocol.Message{
+		Type:    protocol.MsgHostRegister,
+		Session: "test-multi-05",
+	})
+
+	client := dialWS(t, server)
+	sendMsg(t, client, protocol.Message{
+		Type:    protocol.MsgClientJoin,
+		Session: "test-multi-05",
+	})
+	joinMsg := readMsg(t, host)
+	clientID := joinMsg.ClientID
+
+	client.Close()
+
+	leftMsg := readMsg(t, host)
+	if leftMsg.Type != protocol.MsgPeerEvent || leftMsg.Event != "left" {
+		t.Fatalf("expected peer_event left, got %+v", leftMsg)
+	}
+	if leftMsg.ClientID != clientID {
+		t.Errorf("left ClientID = %q, want %q", leftMsg.ClientID, clientID)
+	}
+}
+
+func TestHostDisconnectClosesAllClients(t *testing.T) {
+	server, _ := newTestServer(t)
+
+	host := dialWS(t, server)
+	sendMsg(t, host, protocol.Message{
+		Type:    protocol.MsgHostRegister,
+		Session: "test-multi-06",
+	})
+
+	clientA := dialWS(t, server)
+	defer clientA.Close()
+	sendMsg(t, clientA, protocol.Message{
+		Type:    protocol.MsgClientJoin,
+		Session: "test-multi-06",
+	})
+	readMsg(t, host)    // peer_event
+	readMsg(t, clientA) // session_joined
+
+	clientB := dialWS(t, server)
+	defer clientB.Close()
+	sendMsg(t, clientB, protocol.Message{
+		Type:    protocol.MsgClientJoin,
+		Session: "test-multi-06",
+	})
+	readMsg(t, host)    // peer_event
+	readMsg(t, clientB) // session_joined
+
+	// Host disconnects
+	host.Close()
+
+	// Both clients should have their connections closed
+	clientA.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, _, errA := clientA.ReadMessage()
+	if errA == nil {
+		t.Error("client A connection should be closed after host disconnect")
+	}
+	clientB.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, _, errB := clientB.ReadMessage()
+	if errB == nil {
+		t.Error("client B connection should be closed after host disconnect")
+	}
+}
+
 func TestDuplicateSessionCode(t *testing.T) {
 	server, _ := newTestServer(t)
 
@@ -588,14 +860,14 @@ func TestDuplicateSessionCode(t *testing.T) {
 	}
 }
 
-func TestDisplacedClientGetsError(t *testing.T) {
+func TestSecondClientDoesNotDisplaceFirst(t *testing.T) {
 	server, _ := newTestServer(t)
 
 	host := dialWS(t, server)
 	defer host.Close()
 	sendMsg(t, host, protocol.Message{
 		Type:    protocol.MsgHostRegister,
-		Session: "test-fox-displace",
+		Session: "test-fox-coexist",
 	})
 
 	// First client joins
@@ -603,41 +875,29 @@ func TestDisplacedClientGetsError(t *testing.T) {
 	defer client1.Close()
 	sendMsg(t, client1, protocol.Message{
 		Type:    protocol.MsgClientJoin,
-		Session: "test-fox-displace",
+		Session: "test-fox-coexist",
 	})
+	readMsg(t, host)    // peer_event
+	readMsg(t, client1) // session_joined
 
-	// Read peer_event on host, session_joined on client1
-	readMsg(t, host)
-	readMsg(t, client1)
-
-	// Second client joins the same session
+	// Second client joins — should NOT displace the first
 	client2 := dialWS(t, server)
 	defer client2.Close()
 	sendMsg(t, client2, protocol.Message{
 		Type:    protocol.MsgClientJoin,
-		Session: "test-fox-displace",
+		Session: "test-fox-coexist",
 	})
+	readMsg(t, host)    // peer_event
+	readMsg(t, client2) // session_joined
 
-	// First client should receive an error about being displaced
-	msg := readMsg(t, client1)
-	if msg.Type != protocol.MsgError {
-		t.Errorf("expected error for displaced client, got %+v", msg)
-	}
-	if msg.ErrMessage != "replaced by another client" {
-		t.Errorf("message = %q, want %q", msg.ErrMessage, "replaced by another client")
-	}
-
-	// First client's connection should be closed
-	client1.SetReadDeadline(time.Now().Add(2 * time.Second))
-	_, _, err := client1.ReadMessage()
-	if err == nil {
-		t.Error("expected displaced client connection to be closed")
-	}
-
-	// Second client should get session_joined
-	ack := readMsg(t, client2)
-	if ack.Type != protocol.MsgSessionJoined {
-		t.Errorf("expected session_joined for second client, got %+v", ack)
+	// First client should still be able to send input
+	sendMsg(t, client1, protocol.Message{
+		Type: protocol.MsgInput,
+		Data: "c3RpbGxoZXJl",
+	})
+	msg := readMsg(t, host)
+	if msg.Type != protocol.MsgInput || msg.Data != "c3RpbGxoZXJl" {
+		t.Errorf("expected input from client1, got %+v", msg)
 	}
 }
 

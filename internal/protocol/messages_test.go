@@ -125,6 +125,7 @@ func TestUnmarshalRoundTrip(t *testing.T) {
 		{Type: MsgPeerEvent, Event: "joined"},
 		{Type: MsgPeerEvent, Event: "left"},
 		{Type: MsgResize, Cols: 80, Rows: 24},
+		{Type: MsgInput, Data: "aGVsbG8=", ClientID: "abc123"},
 	}
 	for _, tc := range cases {
 		data, err := json.Marshal(tc)
@@ -149,6 +150,9 @@ func TestUnmarshalRoundTrip(t *testing.T) {
 		}
 		if got.Event != tc.Event {
 			t.Errorf("event = %v, want %v", got.Event, tc.Event)
+		}
+		if got.ClientID != tc.ClientID {
+			t.Errorf("client_id = %v, want %v", got.ClientID, tc.ClientID)
 		}
 	}
 }
@@ -189,6 +193,36 @@ func TestResizeOmitsZeroColsRows(t *testing.T) {
 	}
 	if _, ok := raw["rows"]; ok {
 		t.Error("rows field should be omitted when zero")
+	}
+}
+
+func TestMarshalClientID(t *testing.T) {
+	msg := Message{
+		Type:     MsgInput,
+		Data:     "aGVsbG8=",
+		ClientID: "a3f2b1c4",
+	}
+	data, err := json.Marshal(msg)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var raw map[string]interface{}
+	json.Unmarshal(data, &raw)
+	if raw["client_id"] != "a3f2b1c4" {
+		t.Errorf("client_id = %v, want a3f2b1c4", raw["client_id"])
+	}
+}
+
+func TestClientIDOmittedWhenEmpty(t *testing.T) {
+	msg := Message{
+		Type: MsgInput,
+		Data: "aGVsbG8=",
+	}
+	data, _ := json.Marshal(msg)
+	var raw map[string]interface{}
+	json.Unmarshal(data, &raw)
+	if _, ok := raw["client_id"]; ok {
+		t.Error("client_id field should be omitted when empty")
 	}
 }
 

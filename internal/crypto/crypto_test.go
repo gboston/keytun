@@ -160,6 +160,27 @@ func TestCompleteWithInvalidPublicKey(t *testing.T) {
 	}
 }
 
+func TestIsReady(t *testing.T) {
+	a, err := NewSession()
+	if err != nil {
+		t.Fatalf("NewSession: %v", err)
+	}
+	if a.IsReady() {
+		t.Fatal("expected IsReady() == false before Complete")
+	}
+
+	b, err := NewSession()
+	if err != nil {
+		t.Fatalf("NewSession: %v", err)
+	}
+	if err := a.Complete(b.PublicKey()); err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+	if !a.IsReady() {
+		t.Fatal("expected IsReady() == true after Complete")
+	}
+}
+
 func TestDecryptCiphertextTooShort(t *testing.T) {
 	_, bob := completedPair(t)
 	// Nonce is 12 bytes for AES-GCM, so anything shorter should fail

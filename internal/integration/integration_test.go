@@ -161,6 +161,100 @@ func TestEndToEnd_MultipleInputMessages(t *testing.T) {
 	}
 }
 
+func TestEndToEnd_TwoClientsCanTypeSimultaneously(t *testing.T) {
+	server := startRelay(t)
+	url := wsURL(server)
+
+	inj := newPTYInjector(t)
+	h, err := host.New(url, "e2e-fox-50", inj)
+	if err != nil {
+		t.Fatalf("host.New: %v", err)
+	}
+	defer h.Close()
+
+	// Connect two clients to the same session
+	c1, err := client.New(url, "e2e-fox-50")
+	if err != nil {
+		t.Fatalf("client.New (c1): %v", err)
+	}
+	defer c1.Close()
+
+	c2, err := client.New(url, "e2e-fox-50")
+	if err != nil {
+		t.Fatalf("client.New (c2): %v", err)
+	}
+	defer c2.Close()
+
+	// Client 1 sends a command
+	if err := c1.SendInput([]byte("echo from-client-one\n")); err != nil {
+		t.Fatalf("c1.SendInput: %v", err)
+	}
+	output := h.ReadOutputUntil("from-client-one", 5*time.Second)
+	if !strings.Contains(output, "from-client-one") {
+		t.Errorf("expected host output to contain 'from-client-one', got: %q", output)
+	}
+
+	// Client 2 sends a command
+	if err := c2.SendInput([]byte("echo from-client-two\n")); err != nil {
+		t.Fatalf("c2.SendInput: %v", err)
+	}
+	output = h.ReadOutputUntil("from-client-two", 5*time.Second)
+	if !strings.Contains(output, "from-client-two") {
+		t.Errorf("expected host output to contain 'from-client-two', got: %q", output)
+	}
+}
+
+func TestEndToEnd_ClientDisconnectDoesNotAffectOtherClients(t *testing.T) {
+	server := startRelay(t)
+	url := wsURL(server)
+
+	inj := newPTYInjector(t)
+	h, err := host.New(url, "e2e-fox-51", inj)
+	if err != nil {
+		t.Fatalf("host.New: %v", err)
+	}
+	defer h.Close()
+
+	// Connect two clients
+	c1, err := client.New(url, "e2e-fox-51")
+	if err != nil {
+		t.Fatalf("client.New (c1): %v", err)
+	}
+	defer c1.Close()
+
+	c2, err := client.New(url, "e2e-fox-51")
+	if err != nil {
+		t.Fatalf("client.New (c2): %v", err)
+	}
+
+	// Verify c2 can type
+	if err := c2.SendInput([]byte("echo c2-before\n")); err != nil {
+		t.Fatalf("c2.SendInput: %v", err)
+	}
+	output := h.ReadOutputUntil("c2-before", 5*time.Second)
+	if !strings.Contains(output, "c2-before") {
+		t.Fatalf("expected 'c2-before' in output, got: %q", output)
+	}
+
+	// Disconnect c2
+	c2.Close()
+
+	// Wait for the disconnect banner
+	output = h.ReadOutputUntil("client disconnected", 3*time.Second)
+	if !strings.Contains(output, "client disconnected") {
+		t.Fatalf("expected 'client disconnected' banner, got: %q", output)
+	}
+
+	// Client 1 should still work fine
+	if err := c1.SendInput([]byte("echo c1-still-works\n")); err != nil {
+		t.Fatalf("c1.SendInput after c2 disconnect: %v", err)
+	}
+	output = h.ReadOutputUntil("c1-still-works", 5*time.Second)
+	if !strings.Contains(output, "c1-still-works") {
+		t.Errorf("expected 'c1-still-works' in output after c2 disconnect, got: %q", output)
+	}
+}
+
 func TestEndToEnd_HostOutputReachesClient(t *testing.T) {
 	server := startRelay(t)
 	url := wsURL(server)

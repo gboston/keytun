@@ -63,6 +63,11 @@ func (s *Session) Complete(peerPubBytes []byte) error {
 	return nil
 }
 
+// IsReady returns true if the key exchange has been completed and encryption is available.
+func (s *Session) IsReady() bool {
+	return s.aead != nil
+}
+
 // Encrypt encrypts plaintext using AES-256-GCM. Returns nonce || ciphertext.
 func (s *Session) Encrypt(plaintext []byte) ([]byte, error) {
 	if s.aead == nil {

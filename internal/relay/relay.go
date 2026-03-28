@@ -3,6 +3,8 @@
 package relay
 
 import (
+	crypto_rand "crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"log"
 	"net"
@@ -15,6 +17,13 @@ import (
 	"github.com/gorilla/websocket"
 	"golang.org/x/time/rate"
 )
+
+// generateClientID returns an 8-character hex string from crypto/rand.
+func generateClientID() string {
+	b := make([]byte, 4)
+	crypto_rand.Read(b)
+	return hex.EncodeToString(b)
+}
 
 // realIP returns the client's IP address. It prefers the CF-Connecting-IP
 // header set by Cloudflare, then falls back to the TCP remote address.
@@ -64,10 +73,10 @@ const pongTimeout = 40 * time.Second
 
 // session holds the state for a single keytun session.
 type session struct {
-	host   *websocket.Conn
-	hostMu sync.Mutex // serializes writes to the host connection
-	client *websocket.Conn
-	mu     sync.Mutex // protects the client field
+	host     *websocket.Conn
+	hostMu   sync.Mutex      // serializes writes to the host connection
+	clients  map[string]*websocket.Conn // clientID -> connection
+	clientMu sync.RWMutex    // protects the clients map
 }
 
 // ipEntry tracks a per-IP rate limiter and when it was last used.
@@ -141,11 +150,11 @@ func (r *Relay) CloseAllSessions() {
 	defer r.mu.Unlock()
 	for _, sess := range r.sessions {
 		sess.host.Close()
-		sess.mu.Lock()
-		if sess.client != nil {
-			sess.client.Close()
+		sess.clientMu.RLock()
+		for _, c := range sess.clients {
+			c.Close()
 		}
-		sess.mu.Unlock()
+		sess.clientMu.RUnlock()
 	}
 }
 
@@ -201,7 +210,10 @@ func (r *Relay) handleHost(conn *websocket.Conn, code string) {
 		sendError(conn, "session code already in use")
 		return
 	}
-	sess := &session{host: conn}
+	sess := &session{
+		host:    conn,
+		clients: make(map[string]*websocket.Conn),
+	}
 	r.sessions[code] = sess
 	r.mu.Unlock()
 
@@ -215,14 +227,15 @@ func (r *Relay) handleHost(conn *websocket.Conn, code string) {
 		delete(r.sessions, code)
 		r.mu.Unlock()
 		conn.Close()
-		sess.mu.Lock()
-		if sess.client != nil {
-			sess.client.Close()
+		sess.clientMu.RLock()
+		for _, c := range sess.clients {
+			c.Close()
 		}
-		sess.mu.Unlock()
+		sess.clientMu.RUnlock()
 	}()
 
-	// Read messages from host and forward to client
+	// Read messages from host and forward to clients.
+	// If ClientID is set, route to that specific client; otherwise broadcast.
 	for {
 		_, data, err := conn.ReadMessage()
 		if err != nil {
@@ -234,19 +247,20 @@ func (r *Relay) handleHost(conn *websocket.Conn, code string) {
 			continue
 		}
 
-		sess.mu.Lock()
-		client := sess.client
-		sess.mu.Unlock()
-
-		if client == nil {
-			continue
-		}
-
-		// Forward output, key exchange, and resize messages to client
 		if msg.Type == protocol.MsgOutput || msg.Type == protocol.MsgKeyExchange || msg.Type == protocol.MsgResize {
-			if err := client.WriteMessage(websocket.TextMessage, data); err != nil {
-				continue
+			sess.clientMu.RLock()
+			if msg.ClientID != "" {
+				// Targeted: send to a specific client
+				if c, ok := sess.clients[msg.ClientID]; ok {
+					c.WriteMessage(websocket.TextMessage, data)
+				}
+			} else {
+				// Broadcast: send to all clients
+				for _, c := range sess.clients {
+					c.WriteMessage(websocket.TextMessage, data)
+				}
 			}
+			sess.clientMu.RUnlock()
 		}
 	}
 }
@@ -258,7 +272,9 @@ func (r *Relay) handleClient(conn *websocket.Conn, code string, ip string) {
 		return
 	}
 
-	// Hold r.mu while looking up the session and setting the client so that
+	clientID := generateClientID()
+
+	// Hold r.mu while looking up the session and adding the client so that
 	// a concurrent host disconnect cannot remove the session in between.
 	r.mu.Lock()
 	sess, exists := r.sessions[code]
@@ -268,17 +284,7 @@ func (r *Relay) handleClient(conn *websocket.Conn, code string, ip string) {
 		conn.Close()
 		return
 	}
-	sess.mu.Lock()
-	oldClient := sess.client
-	sess.client = conn
-	sess.mu.Unlock()
 	r.mu.Unlock()
-
-	// Notify and close the displaced client so it doesn't hang silently
-	if oldClient != nil {
-		sendError(oldClient, "replaced by another client")
-		oldClient.Close()
-	}
 
 	configureKeepalive(conn)
 	var clientWriteMu sync.Mutex
@@ -287,30 +293,38 @@ func (r *Relay) handleClient(conn *websocket.Conn, code string, ip string) {
 
 	// Acknowledge to client that they joined successfully
 	sendJSON(conn, protocol.Message{
-		Type:    protocol.MsgSessionJoined,
-		Session: code,
+		Type:     protocol.MsgSessionJoined,
+		Session:  code,
+		ClientID: clientID,
 	})
 
-	// Notify host that client joined
+	// Add to session's client map
+	sess.clientMu.Lock()
+	sess.clients[clientID] = conn
+	sess.clientMu.Unlock()
+
+	// Notify host that client joined (with ClientID)
 	sess.sendToHost(protocol.Message{
-		Type:  protocol.MsgPeerEvent,
-		Event: "joined",
+		Type:     protocol.MsgPeerEvent,
+		Event:    "joined",
+		ClientID: clientID,
 	})
 
 	defer func() {
 		close(done)
 		conn.Close()
-		sess.mu.Lock()
-		sess.client = nil
-		sess.mu.Unlock()
-		// Notify host that client left
+		sess.clientMu.Lock()
+		delete(sess.clients, clientID)
+		sess.clientMu.Unlock()
+		// Notify host that client left (with ClientID)
 		sess.sendToHost(protocol.Message{
-			Type:  protocol.MsgPeerEvent,
-			Event: "left",
+			Type:     protocol.MsgPeerEvent,
+			Event:    "left",
+			ClientID: clientID,
 		})
 	}()
 
-	// Read messages from client and forward to host
+	// Read messages from client and forward to host with ClientID injected
 	for {
 		_, data, err := conn.ReadMessage()
 		if err != nil {
@@ -322,10 +336,15 @@ func (r *Relay) handleClient(conn *websocket.Conn, code string, ip string) {
 			continue
 		}
 
-		// Forward input and key exchange messages to host
+		// Forward input and key exchange messages to host, tagging with this client's ID
 		if msg.Type == protocol.MsgInput || msg.Type == protocol.MsgKeyExchange {
+			msg.ClientID = clientID
+			tagged, err := json.Marshal(msg)
+			if err != nil {
+				continue
+			}
 			sess.hostMu.Lock()
-			err := sess.host.WriteMessage(websocket.TextMessage, data)
+			err = sess.host.WriteMessage(websocket.TextMessage, tagged)
 			sess.hostMu.Unlock()
 			if err != nil {
 				return

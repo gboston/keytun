@@ -31,7 +31,7 @@ type Host struct {
 	localOut         io.Writer
 	outputBuf        strings.Builder
 	outputMu         sync.Mutex
-	cryptoSession    *crypto.Session
+	cryptoSessions   map[string]*crypto.Session // clientID -> crypto session
 	cryptoMu         sync.RWMutex
 	keyReady         chan struct{}
 	done             chan struct{}
@@ -68,13 +68,14 @@ func New(relayURL string, sessionCode string, injector inject.Injector, localOut
 	}
 
 	h := &Host{
-		sessionCode:  sessionCode,
-		conn:         conn,
-		injector:     injector,
-		localOut:     out,
-		keyReady:     make(chan struct{}),
-		done:         make(chan struct{}),
-		clientJoined: make(chan struct{}),
+		sessionCode:    sessionCode,
+		conn:           conn,
+		injector:       injector,
+		localOut:       out,
+		cryptoSessions: make(map[string]*crypto.Session),
+		keyReady:       make(chan struct{}),
+		done:           make(chan struct{}),
+		clientJoined:   make(chan struct{}),
 	}
 
 	// Configure WebSocket keepalive so dead connections are detected quickly
@@ -118,37 +119,58 @@ func (h *Host) UpdateTermSize(cols, rows uint16) {
 	h.SendResize(cols, rows)
 }
 
-// SendResize sends the host's terminal dimensions to the client via the relay.
-// The dimensions are encrypted so the relay only sees ciphertext.
+// SendResize sends the host's terminal dimensions to all ready clients via the relay.
+// Dimensions are encrypted so the relay only sees ciphertext.
 func (h *Host) SendResize(cols, rows uint16) {
-	// Encode dimensions as 4 bytes: cols(BE) + rows(BE)
 	plain := []byte{byte(cols >> 8), byte(cols), byte(rows >> 8), byte(rows)}
-
 	h.cryptoMu.RLock()
-	sess := h.cryptoSession
-	var encrypted []byte
-	if sess != nil {
-		encrypted, _ = sess.Encrypt(plain)
-	}
-	h.cryptoMu.RUnlock()
-
-	if encrypted != nil {
+	defer h.cryptoMu.RUnlock()
+	for clientID, sess := range h.cryptoSessions {
+		if !sess.IsReady() {
+			continue
+		}
+		encrypted, err := sess.Encrypt(plain)
+		if err != nil {
+			continue
+		}
 		encoded := base64.StdEncoding.EncodeToString(encrypted)
 		msg := protocol.Message{
-			Type: protocol.MsgResize,
-			Data: encoded,
+			Type:     protocol.MsgResize,
+			Data:     encoded,
+			ClientID: clientID,
 		}
 		data, _ := json.Marshal(msg)
 		h.writeMessage(websocket.TextMessage, data)
-		return
 	}
+}
 
-	// Fallback to cleartext if encryption is not yet available
-	// (e.g. sending initial dimensions before key exchange)
+// sendResizeTo sends terminal dimensions to a specific client.
+// Falls back to cleartext if encryption is not yet available.
+func (h *Host) sendResizeTo(clientID string, cols, rows uint16) {
+	plain := []byte{byte(cols >> 8), byte(cols), byte(rows >> 8), byte(rows)}
+	h.cryptoMu.RLock()
+	sess, ok := h.cryptoSessions[clientID]
+	h.cryptoMu.RUnlock()
+	if ok && sess.IsReady() {
+		encrypted, err := sess.Encrypt(plain)
+		if err == nil {
+			encoded := base64.StdEncoding.EncodeToString(encrypted)
+			msg := protocol.Message{
+				Type:     protocol.MsgResize,
+				Data:     encoded,
+				ClientID: clientID,
+			}
+			data, _ := json.Marshal(msg)
+			h.writeMessage(websocket.TextMessage, data)
+			return
+		}
+	}
+	// Fallback to cleartext (e.g. sending initial dimensions before key exchange)
 	msg := protocol.Message{
-		Type: protocol.MsgResize,
-		Cols: cols,
-		Rows: rows,
+		Type:     protocol.MsgResize,
+		Cols:     cols,
+		Rows:     rows,
+		ClientID: clientID,
 	}
 	data, _ := json.Marshal(msg)
 	h.writeMessage(websocket.TextMessage, data)
@@ -241,23 +263,47 @@ func (h *Host) ReadOutputUntil(target string, timeout time.Duration) string {
 	return h.outputBuf.String()
 }
 
-// sendEncryptedOutput encrypts data and sends it to the client as an output message.
-func (h *Host) sendEncryptedOutput(data []byte) {
+// broadcastEncryptedOutput encrypts data and sends it to all clients
+// that have completed key exchange.
+func (h *Host) broadcastEncryptedOutput(data []byte) {
 	h.cryptoMu.RLock()
-	sess := h.cryptoSession
-	if sess == nil {
-		h.cryptoMu.RUnlock()
+	defer h.cryptoMu.RUnlock()
+	for clientID, sess := range h.cryptoSessions {
+		if !sess.IsReady() {
+			continue
+		}
+		encrypted, err := sess.Encrypt(data)
+		if err != nil {
+			continue
+		}
+		encoded := base64.StdEncoding.EncodeToString(encrypted)
+		msg := protocol.Message{
+			Type:     protocol.MsgOutput,
+			Data:     encoded,
+			ClientID: clientID,
+		}
+		msgData, _ := json.Marshal(msg)
+		h.writeMessage(websocket.TextMessage, msgData)
+	}
+}
+
+// sendEncryptedOutputTo encrypts data and sends it to a specific client.
+func (h *Host) sendEncryptedOutputTo(clientID string, data []byte) {
+	h.cryptoMu.RLock()
+	sess, ok := h.cryptoSessions[clientID]
+	h.cryptoMu.RUnlock()
+	if !ok || !sess.IsReady() {
 		return
 	}
 	encrypted, err := sess.Encrypt(data)
-	h.cryptoMu.RUnlock()
 	if err != nil {
 		return
 	}
 	encoded := base64.StdEncoding.EncodeToString(encrypted)
 	msg := protocol.Message{
-		Type: protocol.MsgOutput,
-		Data: encoded,
+		Type:     protocol.MsgOutput,
+		Data:     encoded,
+		ClientID: clientID,
 	}
 	msgData, _ := json.Marshal(msg)
 	h.writeMessage(websocket.TextMessage, msgData)
@@ -300,9 +346,22 @@ func (h *Host) readOutput(or inject.OutputReader) {
 		h.outputBuf.Write(buf[:n])
 		h.outputMu.Unlock()
 
-		// Encrypt and forward to relay as output message
-		h.sendEncryptedOutput(buf[:n])
+		// Encrypt and forward to relay as output message (to all ready clients)
+		h.broadcastEncryptedOutput(buf[:n])
 	}
+}
+
+// clientCountStatus returns a terminal title status string like "1 client" or "3 clients".
+func clientCountStatus(n int) string {
+	if n == 1 {
+		return "1 client"
+	}
+	return fmt.Sprintf("%d clients", n)
+}
+
+// clientCountLabel returns a count with a suffix, e.g. "2 total" or "1 remaining".
+func clientCountLabel(n int, suffix string) string {
+	return fmt.Sprintf("%d %s", n, suffix)
 }
 
 // readRelayMessages reads messages from the relay WebSocket and handles them.
@@ -326,14 +385,14 @@ func (h *Host) readRelayMessages() {
 
 		switch msg.Type {
 		case protocol.MsgInput:
-			// Decode base64, decrypt, and deliver via injector
+			// Decode base64, decrypt with the sender's crypto session, and deliver via injector
 			decoded, err := base64.StdEncoding.DecodeString(msg.Data)
 			if err != nil {
 				continue
 			}
 			h.cryptoMu.RLock()
-			sess := h.cryptoSession
-			if sess == nil {
+			sess, ok := h.cryptoSessions[msg.ClientID]
+			if !ok {
 				h.cryptoMu.RUnlock()
 				continue
 			}
@@ -345,19 +404,19 @@ func (h *Host) readRelayMessages() {
 			h.injector.Inject(plaintext)
 
 			// In system mode there is no output stream, so echo input
-			// back to the client so they can see what they typed.
+			// back to all clients so everyone can see what was typed.
 			if !h.injector.HasOutput() {
-				h.sendEncryptedOutput(plaintext)
+				h.broadcastEncryptedOutput(plaintext)
 			}
 		case protocol.MsgKeyExchange:
-			// Peer's public key — complete the ECDH key exchange
+			// Peer's public key — complete the ECDH key exchange for this client
 			peerPub, err := base64.StdEncoding.DecodeString(msg.Data)
 			if err != nil {
 				continue
 			}
 			h.cryptoMu.Lock()
-			sess := h.cryptoSession
-			if sess == nil {
+			sess, ok := h.cryptoSessions[msg.ClientID]
+			if !ok {
 				h.cryptoMu.Unlock()
 				continue
 			}
@@ -373,44 +432,56 @@ func (h *Host) readRelayMessages() {
 				close(h.keyReady)
 			}
 
-			// In system mode, send a banner so the client knows they
-			// will only see echoed keystrokes, not application output.
+			// In system mode, send a banner to this specific client so they know
+			// they will only see echoed keystrokes, not application output.
 			if !h.injector.HasOutput() {
 				banner := "\x1b[90m[system mode — keystrokes are echoed, no application output]\x1b[0m\r\n"
-				h.sendEncryptedOutput([]byte(banner))
+				h.sendEncryptedOutputTo(msg.ClientID, []byte(banner))
 			}
 		case protocol.MsgPeerEvent:
 			var banner string
 			if msg.Event == "joined" {
 				h.clientJoinedOnce.Do(func() { close(h.clientJoined) })
-				h.setTerminalTitle("client connected")
-				banner = "\r\n[keytun] client connected\r\n"
-				// Start key exchange: create session and send our public key
+				// Start key exchange: create a crypto session for this client
 				sess, err := crypto.NewSession()
 				if err != nil {
 					continue
 				}
 				h.cryptoMu.Lock()
-				h.cryptoSession = sess
+				h.cryptoSessions[msg.ClientID] = sess
+				count := len(h.cryptoSessions)
 				h.cryptoMu.Unlock()
 				pubEncoded := base64.StdEncoding.EncodeToString(sess.PublicKey())
 				kxMsg := protocol.Message{
-					Type: protocol.MsgKeyExchange,
-					Data: pubEncoded,
+					Type:     protocol.MsgKeyExchange,
+					Data:     pubEncoded,
+					ClientID: msg.ClientID,
 				}
 				kxData, _ := json.Marshal(kxMsg)
 				h.writeMessage(websocket.TextMessage, kxData)
 
-				// Send current terminal dimensions so the client can match
+				// Send current terminal dimensions to this client
 				h.termMu.Lock()
 				cols, rows := h.termCols, h.termRows
 				h.termMu.Unlock()
 				if cols > 0 && rows > 0 {
-					h.SendResize(cols, rows)
+					h.sendResizeTo(msg.ClientID, cols, rows)
 				}
+
+				h.setTerminalTitle(clientCountStatus(count))
+				banner = fmt.Sprintf("\r\n[keytun] client connected (%s)\r\n", clientCountLabel(count, "total"))
 			} else if msg.Event == "left" {
-				h.setTerminalTitle("session open — waiting for client")
-				banner = "\r\n[keytun] client disconnected — session still open, waiting for reconnect...\r\n"
+				h.cryptoMu.Lock()
+				delete(h.cryptoSessions, msg.ClientID)
+				count := len(h.cryptoSessions)
+				h.cryptoMu.Unlock()
+				if count == 0 {
+					h.setTerminalTitle("no clients — waiting")
+					banner = "\r\n[keytun] client disconnected — session still open, waiting for reconnect...\r\n"
+				} else {
+					h.setTerminalTitle(clientCountStatus(count))
+					banner = fmt.Sprintf("\r\n[keytun] client disconnected (%s)\r\n", clientCountLabel(count, "remaining"))
+				}
 			}
 			if banner != "" {
 				if h.localOut != nil {

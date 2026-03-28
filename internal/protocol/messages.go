@@ -23,6 +23,7 @@ const (
 type Message struct {
 	Type       MessageType `json:"type"`
 	Session    string      `json:"session,omitempty"`
+	ClientID   string      `json:"client_id,omitempty"`
 	Data       string      `json:"data,omitempty"`
 	ErrMessage string      `json:"message,omitempty"`
 	Event      string      `json:"event,omitempty"`

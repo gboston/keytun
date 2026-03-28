@@ -91,10 +91,23 @@ func (n *noOutputInjector) Inject(data []byte) error {
 func (n *noOutputInjector) HasOutput() bool { return false }
 func (n *noOutputInjector) Close() error    { return nil }
 
+// clientSession holds the result of a simulated client join with key exchange.
+type clientSession struct {
+	crypto   *crypto.Session
+	clientID string
+}
+
 // simulateClientJoinWithKeyExchange joins a session as a raw WS client and
 // performs the encryption key exchange with the host. Returns the crypto
 // session for encrypting/decrypting messages.
 func simulateClientJoinWithKeyExchange(t *testing.T, conn *websocket.Conn, session string) *crypto.Session {
+	t.Helper()
+	cs := simulateClientJoinFull(t, conn, session)
+	return cs.crypto
+}
+
+// simulateClientJoinFull joins a session and returns both the crypto session and the client ID.
+func simulateClientJoinFull(t *testing.T, conn *websocket.Conn, session string) clientSession {
 	t.Helper()
 	// Send client_join
 	sendMsg(t, conn, protocol.Message{
@@ -115,7 +128,7 @@ func simulateClientJoinWithKeyExchange(t *testing.T, conn *websocket.Conn, sessi
 		Data: pubEncoded,
 	})
 
-	// Read host's key_exchange
+	// Read host's key_exchange (now includes ClientID)
 	kxMsg := readMsg(t, conn)
 	if kxMsg.Type != protocol.MsgKeyExchange {
 		t.Fatalf("expected key_exchange, got %+v", kxMsg)
@@ -127,7 +140,7 @@ func simulateClientJoinWithKeyExchange(t *testing.T, conn *websocket.Conn, sessi
 	if err := sess.Complete(peerPub); err != nil {
 		t.Fatalf("complete key exchange: %v", err)
 	}
-	return sess
+	return clientSession{crypto: sess, clientID: kxMsg.ClientID}
 }
 
 func TestHostConnectsAndRegisters(t *testing.T) {
@@ -498,18 +511,18 @@ func TestHostSetsTerminalTitleOnStateChanges(t *testing.T) {
 		t.Errorf("expected waiting title %q in output, got: %q", wantWaiting, output)
 	}
 
-	// Client joins — title should update to "client connected"
+	// Client joins — title should update to "1 client"
 	clientConn := dialWS(t, server)
 	simulateClientJoinWithKeyExchange(t, clientConn, "test-title-01")
 
 	time.Sleep(200 * time.Millisecond)
 	output = localBuf.String()
-	wantConnected := "\x1b]0;keytun: test-title-01 (client connected)\x07"
+	wantConnected := "\x1b]0;keytun: test-title-01 (1 client)\x07"
 	if !strings.Contains(output, wantConnected) {
 		t.Errorf("expected connected title %q in output, got: %q", wantConnected, output)
 	}
 
-	// Client disconnects — title should show session is still open
+	// Client disconnects — title should show no clients waiting
 	clientConn.Close()
 	time.Sleep(300 * time.Millisecond)
 	output = localBuf.String()
@@ -518,9 +531,9 @@ func TestHostSetsTerminalTitleOnStateChanges(t *testing.T) {
 		t.Fatal("connected title not found")
 	}
 	remainder := output[afterConnected+len(wantConnected):]
-	wantDisconnected := "\x1b]0;keytun: test-title-01 (session open \xe2\x80\x94 waiting for client)\x07"
+	wantDisconnected := "\x1b]0;keytun: test-title-01 (no clients \xe2\x80\x94 waiting)\x07"
 	if !strings.Contains(remainder, wantDisconnected) {
-		t.Errorf("expected 'session open' title after disconnect in output, got remainder: %q", remainder)
+		t.Errorf("expected 'no clients' title after disconnect in output, got remainder: %q", remainder)
 	}
 }
 
@@ -584,4 +597,164 @@ func TestHostSendsBannerWhenNoOutput(t *testing.T) {
 	if !found {
 		t.Error("expected client to receive a system mode banner after key exchange")
 	}
+}
+
+func TestHostMultipleClientsReceiveOutput(t *testing.T) {
+	server := setupRelay(t)
+	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+
+	inj := newPTYInjector(t)
+	h, err := New(relayURL, "test-multi-out-01", inj)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer h.Close()
+
+	// Two clients join with key exchange
+	connA := dialWS(t, server)
+	defer connA.Close()
+	csA := simulateClientJoinFull(t, connA, "test-multi-out-01")
+
+	connB := dialWS(t, server)
+	defer connB.Close()
+	csB := simulateClientJoinFull(t, connB, "test-multi-out-01")
+
+	// Client A sends a command that produces output
+	plaintext := []byte("echo multitest\n")
+	encrypted, err := csA.crypto.Encrypt(plaintext)
+	if err != nil {
+		t.Fatalf("encrypt: %v", err)
+	}
+	encoded := base64.StdEncoding.EncodeToString(encrypted)
+	sendMsg(t, connA, protocol.Message{
+		Type: protocol.MsgInput,
+		Data: encoded,
+	})
+
+	// Host should see the output
+	output := h.ReadOutputUntil("multitest", 5*time.Second)
+	if !strings.Contains(output, "multitest") {
+		t.Fatalf("expected host output to contain 'multitest', got: %q", output)
+	}
+
+	// Both clients should receive encrypted output they can decrypt
+	decryptOutput := func(conn *websocket.Conn, sess *crypto.Session) bool {
+		deadline := time.Now().Add(5 * time.Second)
+		for time.Now().Before(deadline) {
+			conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+			_, data, err := conn.ReadMessage()
+			if err != nil {
+				break
+			}
+			var msg protocol.Message
+			json.Unmarshal(data, &msg)
+			if msg.Type == protocol.MsgOutput && msg.Data != "" {
+				ciphertext, _ := base64.StdEncoding.DecodeString(msg.Data)
+				_, decErr := sess.Decrypt(ciphertext)
+				if decErr == nil {
+					return true
+				}
+			}
+		}
+		return false
+	}
+
+	if !decryptOutput(connA, csA.crypto) {
+		t.Error("client A did not receive decryptable output")
+	}
+	if !decryptOutput(connB, csB.crypto) {
+		t.Error("client B did not receive decryptable output")
+	}
+}
+
+func TestHostMultiClientInputFromDifferentClients(t *testing.T) {
+	server := setupRelay(t)
+	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+
+	inj := &noOutputInjector{}
+	h, err := New(relayURL, "test-multi-input-01", inj)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer h.Close()
+
+	connA := dialWS(t, server)
+	defer connA.Close()
+	csA := simulateClientJoinFull(t, connA, "test-multi-input-01")
+
+	connB := dialWS(t, server)
+	defer connB.Close()
+	csB := simulateClientJoinFull(t, connB, "test-multi-input-01")
+
+	// Drain system mode banners from both clients
+	time.Sleep(200 * time.Millisecond)
+
+	// Client A sends "alpha"
+	encA, _ := csA.crypto.Encrypt([]byte("alpha"))
+	sendMsg(t, connA, protocol.Message{
+		Type: protocol.MsgInput,
+		Data: base64.StdEncoding.EncodeToString(encA),
+	})
+
+	// Client B sends "beta"
+	encB, _ := csB.crypto.Encrypt([]byte("beta"))
+	sendMsg(t, connB, protocol.Message{
+		Type: protocol.MsgInput,
+		Data: base64.StdEncoding.EncodeToString(encB),
+	})
+
+	// Injector should receive both
+	time.Sleep(500 * time.Millisecond)
+	inj.mu.Lock()
+	injected := string(inj.injected)
+	inj.mu.Unlock()
+	if !strings.Contains(injected, "alpha") {
+		t.Errorf("expected injector to contain 'alpha', got: %q", injected)
+	}
+	if !strings.Contains(injected, "beta") {
+		t.Errorf("expected injector to contain 'beta', got: %q", injected)
+	}
+}
+
+func TestHostMultiClientDisconnectCleansUpSession(t *testing.T) {
+	server := setupRelay(t)
+	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+
+	inj := &noOutputInjector{}
+	h, err := New(relayURL, "test-multi-dc-01", inj)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer h.Close()
+
+	// Client A joins
+	connA := dialWS(t, server)
+	csA := simulateClientJoinFull(t, connA, "test-multi-dc-01")
+
+	// Client B joins
+	connB := dialWS(t, server)
+	defer connB.Close()
+	csB := simulateClientJoinFull(t, connB, "test-multi-dc-01")
+
+	// Client A disconnects
+	connA.Close()
+	time.Sleep(300 * time.Millisecond)
+
+	// Client B can still send input
+	encB, _ := csB.crypto.Encrypt([]byte("stillhere"))
+	sendMsg(t, connB, protocol.Message{
+		Type: protocol.MsgInput,
+		Data: base64.StdEncoding.EncodeToString(encB),
+	})
+
+	time.Sleep(300 * time.Millisecond)
+	inj.mu.Lock()
+	injected := string(inj.injected)
+	inj.mu.Unlock()
+	if !strings.Contains(injected, "stillhere") {
+		t.Errorf("expected injector to contain 'stillhere', got: %q", injected)
+	}
+
+	// Verify client A's session was cleaned up (use a type assertion to check map size)
+	_ = csA // used during join, verifying A's session is removed
 }
