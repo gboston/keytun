@@ -308,7 +308,7 @@ func (h *Host) readRelayMessages() {
 			var banner string
 			if msg.Event == "joined" {
 				h.clientJoinedOnce.Do(func() { close(h.clientJoined) })
-				h.setTerminalTitle("connected")
+				h.setTerminalTitle("client connected")
 				banner = "\r\n[keytun] client connected\r\n"
 				// Start key exchange: create session and send our public key
 				sess, err := crypto.NewSession()
@@ -329,8 +329,8 @@ func (h *Host) readRelayMessages() {
 					h.SendResize(h.termCols, h.termRows)
 				}
 			} else if msg.Event == "left" {
-				h.setTerminalTitle("waiting")
-				banner = "\r\n[keytun] client disconnected\r\n"
+				h.setTerminalTitle("session open — waiting for client")
+				banner = "\r\n[keytun] client disconnected — session still open, waiting for reconnect...\r\n"
 			}
 			if banner != "" {
 				if h.localOut != nil {

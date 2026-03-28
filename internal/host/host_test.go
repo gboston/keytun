@@ -477,29 +477,29 @@ func TestHostSetsTerminalTitleOnStateChanges(t *testing.T) {
 		t.Errorf("expected waiting title %q in output, got: %q", wantWaiting, output)
 	}
 
-	// Client joins — title should update to "connected"
+	// Client joins — title should update to "client connected"
 	clientConn := dialWS(t, server)
 	simulateClientJoinWithKeyExchange(t, clientConn, "test-title-01")
 
 	time.Sleep(200 * time.Millisecond)
 	output = localBuf.String()
-	wantConnected := "\x1b]0;keytun: test-title-01 (connected)\x07"
+	wantConnected := "\x1b]0;keytun: test-title-01 (client connected)\x07"
 	if !strings.Contains(output, wantConnected) {
 		t.Errorf("expected connected title %q in output, got: %q", wantConnected, output)
 	}
 
-	// Client disconnects — title should revert to "waiting"
+	// Client disconnects — title should show session is still open
 	clientConn.Close()
 	time.Sleep(300 * time.Millisecond)
 	output = localBuf.String()
-	// Should contain a second "waiting" title after the "connected" one
 	afterConnected := strings.LastIndex(output, wantConnected)
 	if afterConnected < 0 {
 		t.Fatal("connected title not found")
 	}
 	remainder := output[afterConnected+len(wantConnected):]
-	if !strings.Contains(remainder, wantWaiting) {
-		t.Errorf("expected waiting title after disconnect in output, got remainder: %q", remainder)
+	wantDisconnected := "\x1b]0;keytun: test-title-01 (session open \xe2\x80\x94 waiting for client)\x07"
+	if !strings.Contains(remainder, wantDisconnected) {
+		t.Errorf("expected 'session open' title after disconnect in output, got remainder: %q", remainder)
 	}
 }
 
