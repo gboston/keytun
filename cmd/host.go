@@ -42,7 +42,7 @@ func runTerminalMode(code string) error {
 	fmt.Printf("Session: %s\n", code)
 	fmt.Printf("Join:    https://keytun.com/s/%s\n", code)
 	fmt.Println("Waiting for client... (share the link with your colleague)")
-	fmt.Println("Press Ctrl+C to cancel.")
+	fmt.Println("Press Ctrl+C to cancel. Type 'exit' to end the session.")
 	fmt.Println()
 
 	inj, err := inject.NewPTY()
@@ -79,6 +79,13 @@ func runTerminalMode(code string) error {
 	if err != nil {
 		return fmt.Errorf("failed to set raw mode: %w", err)
 	}
+
+	// When the shell process exits (e.g. user types "exit"), close stdin
+	// so the read loop below unblocks immediately.
+	go func() {
+		<-inj.Done()
+		os.Stdin.Close()
+	}()
 
 	// Copy local stdin to PTY. Before a client joins, Ctrl+C (0x03) exits
 	// keytun cleanly instead of passing through to the PTY shell.

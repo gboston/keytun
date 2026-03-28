@@ -14,6 +14,7 @@ import (
 type PTYInjector struct {
 	ptmx *os.File
 	cmd  *exec.Cmd
+	done chan struct{}
 }
 
 // NewPTY creates a PTYInjector by spawning the user's shell in a new PTY.
@@ -31,7 +32,12 @@ func NewPTY() (*PTYInjector, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &PTYInjector{ptmx: ptmx, cmd: cmd}, nil
+	p := &PTYInjector{ptmx: ptmx, cmd: cmd, done: make(chan struct{})}
+	go func() {
+		cmd.Wait()
+		close(p.done)
+	}()
+	return p, nil
 }
 
 // Inject writes raw keystroke bytes to the PTY.
@@ -60,6 +66,11 @@ func (p *PTYInjector) Cmd() *exec.Cmd {
 	return p.cmd
 }
 
+// Done returns a channel that is closed when the shell process exits.
+func (p *PTYInjector) Done() <-chan struct{} {
+	return p.done
+}
+
 // ResizePTY sets the PTY window size.
 func (p *PTYInjector) ResizePTY(rows, cols uint16) error {
 	return pty.Setsize(p.ptmx, &pty.Winsize{Rows: rows, Cols: cols})
@@ -69,7 +80,7 @@ func (p *PTYInjector) ResizePTY(rows, cols uint16) error {
 func (p *PTYInjector) Close() error {
 	p.ptmx.Close()
 	p.cmd.Process.Kill()
-	// Wait returns an error for killed processes; that's expected.
-	p.cmd.Wait()
+	// Wait for the background goroutine to finish reaping the process.
+	<-p.done
 	return nil
 }

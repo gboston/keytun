@@ -87,6 +87,44 @@ func TestPTYInjectorResizePTY(t *testing.T) {
 	}
 }
 
+func TestPTYInjectorDoneClosesWhenShellExits(t *testing.T) {
+	p, err := NewPTY()
+	if err != nil {
+		t.Fatalf("NewPTY: %v", err)
+	}
+	defer p.Close()
+
+	// Drain PTY output so the shell process can exit cleanly.
+	// cmd.Wait() blocks until the PTY output is fully consumed.
+	go func() {
+		buf := make([]byte, 4096)
+		for {
+			if _, err := p.OutputFd().Read(buf); err != nil {
+				return
+			}
+		}
+	}()
+
+	// Done should not be closed yet
+	select {
+	case <-p.Done():
+		t.Fatal("Done channel closed before shell exited")
+	default:
+	}
+
+	// Wait for the shell to start, then tell it to exit
+	time.Sleep(500 * time.Millisecond)
+	p.Inject([]byte("exit\n"))
+
+	// Done should close within a reasonable time
+	select {
+	case <-p.Done():
+		// expected
+	case <-time.After(5 * time.Second):
+		t.Fatal("Done channel not closed after shell exited")
+	}
+}
+
 func TestPTYInjectorClose(t *testing.T) {
 	p, err := NewPTY()
 	if err != nil {
