@@ -17,6 +17,11 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const (
+	pingInterval = 30 * time.Second
+	pongTimeout  = 40 * time.Second
+)
+
 // Host manages a keytun hosting session.
 type Host struct {
 	sessionCode      string
@@ -27,6 +32,7 @@ type Host struct {
 	outputBuf        strings.Builder
 	outputMu         sync.Mutex
 	cryptoSession    *crypto.Session
+	cryptoMu         sync.RWMutex
 	keyReady         chan struct{}
 	done             chan struct{}
 	wg               sync.WaitGroup
@@ -34,6 +40,7 @@ type Host struct {
 	clientJoinedOnce sync.Once
 	termCols         uint16
 	termRows         uint16
+	termMu           sync.Mutex
 }
 
 // New creates a new Host that connects to the relay and uses the given injector.
@@ -70,6 +77,15 @@ func New(relayURL string, sessionCode string, injector inject.Injector, localOut
 		clientJoined: make(chan struct{}),
 	}
 
+	// Configure WebSocket keepalive so dead connections are detected quickly
+	conn.SetReadDeadline(time.Now().Add(pongTimeout))
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(pongTimeout))
+		return nil
+	})
+	h.wg.Add(1)
+	go h.pingLoop()
+
 	// Set initial terminal title showing the session is waiting for a client
 	h.setTerminalTitle("waiting")
 
@@ -95,13 +111,40 @@ func (h *Host) SessionCode() string {
 
 // UpdateTermSize stores the current terminal dimensions and sends them to the client.
 func (h *Host) UpdateTermSize(cols, rows uint16) {
+	h.termMu.Lock()
 	h.termCols = cols
 	h.termRows = rows
+	h.termMu.Unlock()
 	h.SendResize(cols, rows)
 }
 
 // SendResize sends the host's terminal dimensions to the client via the relay.
+// The dimensions are encrypted so the relay only sees ciphertext.
 func (h *Host) SendResize(cols, rows uint16) {
+	// Encode dimensions as 4 bytes: cols(BE) + rows(BE)
+	plain := []byte{byte(cols >> 8), byte(cols), byte(rows >> 8), byte(rows)}
+
+	h.cryptoMu.RLock()
+	sess := h.cryptoSession
+	var encrypted []byte
+	if sess != nil {
+		encrypted, _ = sess.Encrypt(plain)
+	}
+	h.cryptoMu.RUnlock()
+
+	if encrypted != nil {
+		encoded := base64.StdEncoding.EncodeToString(encrypted)
+		msg := protocol.Message{
+			Type: protocol.MsgResize,
+			Data: encoded,
+		}
+		data, _ := json.Marshal(msg)
+		h.writeMessage(websocket.TextMessage, data)
+		return
+	}
+
+	// Fallback to cleartext if encryption is not yet available
+	// (e.g. sending initial dimensions before key exchange)
 	msg := protocol.Message{
 		Type: protocol.MsgResize,
 		Cols: cols,
@@ -117,6 +160,26 @@ func (h *Host) writeMessage(msgType int, data []byte) error {
 	h.connMu.Lock()
 	defer h.connMu.Unlock()
 	return h.conn.WriteMessage(msgType, data)
+}
+
+// pingLoop sends periodic WebSocket pings to keep the connection alive.
+func (h *Host) pingLoop() {
+	defer h.wg.Done()
+	ticker := time.NewTicker(pingInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-h.done:
+			return
+		case <-ticker.C:
+			h.connMu.Lock()
+			err := h.conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(5*time.Second))
+			h.connMu.Unlock()
+			if err != nil {
+				return
+			}
+		}
+	}
 }
 
 // setTerminalTitle sets the terminal window/tab title via OSC escape sequence.
@@ -180,7 +243,14 @@ func (h *Host) ReadOutputUntil(target string, timeout time.Duration) string {
 
 // sendEncryptedOutput encrypts data and sends it to the client as an output message.
 func (h *Host) sendEncryptedOutput(data []byte) {
-	encrypted, err := h.cryptoSession.Encrypt(data)
+	h.cryptoMu.RLock()
+	sess := h.cryptoSession
+	if sess == nil {
+		h.cryptoMu.RUnlock()
+		return
+	}
+	encrypted, err := sess.Encrypt(data)
+	h.cryptoMu.RUnlock()
 	if err != nil {
 		return
 	}
@@ -231,17 +301,7 @@ func (h *Host) readOutput(or inject.OutputReader) {
 		h.outputMu.Unlock()
 
 		// Encrypt and forward to relay as output message
-		encrypted, err := h.cryptoSession.Encrypt(buf[:n])
-		if err != nil {
-			continue
-		}
-		encoded := base64.StdEncoding.EncodeToString(encrypted)
-		msg := protocol.Message{
-			Type: protocol.MsgOutput,
-			Data: encoded,
-		}
-		data, _ := json.Marshal(msg)
-		h.writeMessage(websocket.TextMessage, data)
+		h.sendEncryptedOutput(buf[:n])
 	}
 }
 
@@ -271,7 +331,14 @@ func (h *Host) readRelayMessages() {
 			if err != nil {
 				continue
 			}
-			plaintext, err := h.cryptoSession.Decrypt(decoded)
+			h.cryptoMu.RLock()
+			sess := h.cryptoSession
+			if sess == nil {
+				h.cryptoMu.RUnlock()
+				continue
+			}
+			plaintext, err := sess.Decrypt(decoded)
+			h.cryptoMu.RUnlock()
 			if err != nil {
 				continue
 			}
@@ -288,7 +355,15 @@ func (h *Host) readRelayMessages() {
 			if err != nil {
 				continue
 			}
-			if err := h.cryptoSession.Complete(peerPub); err != nil {
+			h.cryptoMu.Lock()
+			sess := h.cryptoSession
+			if sess == nil {
+				h.cryptoMu.Unlock()
+				continue
+			}
+			err = sess.Complete(peerPub)
+			h.cryptoMu.Unlock()
+			if err != nil {
 				continue
 			}
 			select {
@@ -315,7 +390,9 @@ func (h *Host) readRelayMessages() {
 				if err != nil {
 					continue
 				}
+				h.cryptoMu.Lock()
 				h.cryptoSession = sess
+				h.cryptoMu.Unlock()
 				pubEncoded := base64.StdEncoding.EncodeToString(sess.PublicKey())
 				kxMsg := protocol.Message{
 					Type: protocol.MsgKeyExchange,
@@ -325,8 +402,11 @@ func (h *Host) readRelayMessages() {
 				h.writeMessage(websocket.TextMessage, kxData)
 
 				// Send current terminal dimensions so the client can match
-				if h.termCols > 0 && h.termRows > 0 {
-					h.SendResize(h.termCols, h.termRows)
+				h.termMu.Lock()
+				cols, rows := h.termCols, h.termRows
+				h.termMu.Unlock()
+				if cols > 0 && rows > 0 {
+					h.SendResize(cols, rows)
 				}
 			} else if msg.Event == "left" {
 				h.setTerminalTitle("session open — waiting for client")

@@ -587,3 +587,96 @@ func TestDuplicateSessionCode(t *testing.T) {
 		t.Errorf("expected error for duplicate session, got %+v", msg)
 	}
 }
+
+func TestDisplacedClientGetsError(t *testing.T) {
+	server, _ := newTestServer(t)
+
+	host := dialWS(t, server)
+	defer host.Close()
+	sendMsg(t, host, protocol.Message{
+		Type:    protocol.MsgHostRegister,
+		Session: "test-fox-displace",
+	})
+
+	// First client joins
+	client1 := dialWS(t, server)
+	defer client1.Close()
+	sendMsg(t, client1, protocol.Message{
+		Type:    protocol.MsgClientJoin,
+		Session: "test-fox-displace",
+	})
+
+	// Read peer_event on host, session_joined on client1
+	readMsg(t, host)
+	readMsg(t, client1)
+
+	// Second client joins the same session
+	client2 := dialWS(t, server)
+	defer client2.Close()
+	sendMsg(t, client2, protocol.Message{
+		Type:    protocol.MsgClientJoin,
+		Session: "test-fox-displace",
+	})
+
+	// First client should receive an error about being displaced
+	msg := readMsg(t, client1)
+	if msg.Type != protocol.MsgError {
+		t.Errorf("expected error for displaced client, got %+v", msg)
+	}
+	if msg.ErrMessage != "replaced by another client" {
+		t.Errorf("message = %q, want %q", msg.ErrMessage, "replaced by another client")
+	}
+
+	// First client's connection should be closed
+	client1.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, _, err := client1.ReadMessage()
+	if err == nil {
+		t.Error("expected displaced client connection to be closed")
+	}
+
+	// Second client should get session_joined
+	ack := readMsg(t, client2)
+	if ack.Type != protocol.MsgSessionJoined {
+		t.Errorf("expected session_joined for second client, got %+v", ack)
+	}
+}
+
+func TestOversizedMessageRejected(t *testing.T) {
+	server, _ := newTestServer(t)
+
+	host := dialWS(t, server)
+	defer host.Close()
+	sendMsg(t, host, protocol.Message{
+		Type:    protocol.MsgHostRegister,
+		Session: "test-fox-oversize",
+	})
+
+	client := dialWS(t, server)
+	defer client.Close()
+	sendMsg(t, client, protocol.Message{
+		Type:    protocol.MsgClientJoin,
+		Session: "test-fox-oversize",
+	})
+
+	// Read peer_event on host, session_joined on client
+	readMsg(t, host)
+	readMsg(t, client)
+
+	// Send a message that exceeds the relay's read limit
+	oversized := make([]byte, maxMessageSize+1)
+	for i := range oversized {
+		oversized[i] = 'A'
+	}
+	err := client.WriteMessage(websocket.TextMessage, oversized)
+	if err != nil {
+		// Write might fail if connection already closed, which is fine
+		return
+	}
+
+	// The relay should close the connection after the oversized read
+	client.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, _, err = client.ReadMessage()
+	if err == nil {
+		t.Error("expected connection to be closed after oversized message")
+	}
+}

@@ -3,9 +3,13 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/gboston/keytun/internal/relay"
 	"github.com/spf13/cobra"
@@ -29,8 +33,27 @@ var relayCmd = &cobra.Command{
 			return fmt.Errorf("port %d is already in use — is another process listening on it?", relayPort)
 		}
 
+		srv := &http.Server{Handler: mux}
+
+		// Listen for termination signals and shut down gracefully,
+		// giving active WebSocket sessions time to finish.
+		ctx, stop := signal.NotifyContext(cmd.Context(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
+
+		go func() {
+			<-ctx.Done()
+			fmt.Println("\nshutting down relay...")
+			r.CloseAllSessions()
+			shutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			srv.Shutdown(shutCtx)
+		}()
+
 		fmt.Printf("keytun relay listening on %s\n", addr)
-		return http.Serve(ln, mux)
+		if err := srv.Serve(ln); err != http.ErrServerClosed {
+			return err
+		}
+		return nil
 	},
 }
 

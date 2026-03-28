@@ -195,21 +195,42 @@ func TestHostSendsResizeToClient(t *testing.T) {
 	// Simulate a client joining with key exchange
 	clientConn := dialWS(t, server)
 	defer clientConn.Close()
-	simulateClientJoinWithKeyExchange(t, clientConn, "test-owl-resize")
+	clientSess := simulateClientJoinWithKeyExchange(t, clientConn, "test-owl-resize")
 
 	// Host sends resize via UpdateTermSize (stores dims + sends)
 	h.UpdateTermSize(120, 40)
 
-	// Client should receive unencrypted resize message
+	// Client should receive an encrypted resize message
 	msg := readMsg(t, clientConn)
 	if msg.Type != protocol.MsgResize {
 		t.Errorf("expected resize, got %+v", msg)
 	}
-	if msg.Cols != 120 {
-		t.Errorf("cols = %v, want 120", msg.Cols)
+	// Dimensions should be encrypted in Data, not cleartext
+	if msg.Cols != 0 || msg.Rows != 0 {
+		t.Errorf("expected zero cols/rows (encrypted), got cols=%v rows=%v", msg.Cols, msg.Rows)
 	}
-	if msg.Rows != 40 {
-		t.Errorf("rows = %v, want 40", msg.Rows)
+	if msg.Data == "" {
+		t.Fatal("expected encrypted Data field, got empty")
+	}
+	// Decrypt and verify dimensions
+	ciphertext, err := base64.StdEncoding.DecodeString(msg.Data)
+	if err != nil {
+		t.Fatalf("decode resize data: %v", err)
+	}
+	plain, err := clientSess.Decrypt(ciphertext)
+	if err != nil {
+		t.Fatalf("decrypt resize: %v", err)
+	}
+	if len(plain) != 4 {
+		t.Fatalf("expected 4 bytes, got %d", len(plain))
+	}
+	cols := uint16(plain[0])<<8 | uint16(plain[1])
+	rows := uint16(plain[2])<<8 | uint16(plain[3])
+	if cols != 120 {
+		t.Errorf("cols = %v, want 120", cols)
+	}
+	if rows != 40 {
+		t.Errorf("rows = %v, want 40", rows)
 	}
 }
 

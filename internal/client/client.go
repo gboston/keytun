@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/gboston/keytun/internal/crypto"
@@ -13,9 +14,15 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const (
+	pingInterval = 30 * time.Second
+	pongTimeout  = 40 * time.Second
+)
+
 // Client manages a keytun client session.
 type Client struct {
 	conn          *websocket.Conn
+	connMu        sync.Mutex
 	cryptoSession *crypto.Session
 	done          chan struct{}
 }
@@ -104,7 +111,11 @@ func New(relayURL string, sessionCode string) (*Client, error) {
 		return nil, fmt.Errorf("key exchange: %w", err)
 	}
 
-	conn.SetReadDeadline(time.Time{})
+	conn.SetReadDeadline(time.Now().Add(pongTimeout))
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(pongTimeout))
+		return nil
+	})
 
 	c := &Client{
 		conn:          conn,
@@ -114,6 +125,7 @@ func New(relayURL string, sessionCode string) (*Client, error) {
 
 	// Read incoming messages in the background to detect connection loss.
 	go c.readLoop()
+	go c.pingLoop()
 
 	return c, nil
 }
@@ -138,6 +150,25 @@ func (c *Client) readLoop() {
 	}
 }
 
+// pingLoop sends periodic WebSocket pings to keep the connection alive.
+func (c *Client) pingLoop() {
+	ticker := time.NewTicker(pingInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-c.done:
+			return
+		case <-ticker.C:
+			c.connMu.Lock()
+			err := c.conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(5*time.Second))
+			c.connMu.Unlock()
+			if err != nil {
+				return
+			}
+		}
+	}
+}
+
 // SendInput encrypts and sends raw bytes as an input message to the relay.
 func (c *Client) SendInput(input []byte) error {
 	encrypted, err := c.cryptoSession.Encrypt(input)
@@ -153,6 +184,8 @@ func (c *Client) SendInput(input []byte) error {
 	if err != nil {
 		return err
 	}
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
 	return c.conn.WriteMessage(websocket.TextMessage, data)
 }
 

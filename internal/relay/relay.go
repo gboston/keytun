@@ -50,11 +50,24 @@ func checkOrigin(r *http.Request) bool {
 
 var upgrader = websocket.Upgrader{CheckOrigin: checkOrigin}
 
+// maxMessageSize limits the size of a single WebSocket message on the relay
+// to prevent OOM from malicious peers. 64KB is generous for keystroke and
+// terminal output messages.
+const maxMessageSize = 64 * 1024
+
+// pingInterval is how often the relay sends WebSocket pings to detect dead connections.
+const pingInterval = 30 * time.Second
+
+// pongTimeout is how long the relay waits for a pong before considering the connection dead.
+// Must be greater than pingInterval.
+const pongTimeout = 40 * time.Second
+
 // session holds the state for a single keytun session.
 type session struct {
 	host   *websocket.Conn
+	hostMu sync.Mutex // serializes writes to the host connection
 	client *websocket.Conn
-	mu     sync.Mutex
+	mu     sync.Mutex // protects the client field
 }
 
 // ipEntry tracks a per-IP rate limiter and when it was last used.
@@ -121,6 +134,21 @@ func (r *Relay) sweepStaleLimiters() {
 	r.limitersMu.Unlock()
 }
 
+// CloseAllSessions closes all active host and client connections, allowing
+// read loops to exit and defer-based cleanup to run.
+func (r *Relay) CloseAllSessions() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, sess := range r.sessions {
+		sess.host.Close()
+		sess.mu.Lock()
+		if sess.client != nil {
+			sess.client.Close()
+		}
+		sess.mu.Unlock()
+	}
+}
+
 // HasSession returns true if a session with the given code exists.
 func (r *Relay) HasSession(code string) bool {
 	r.mu.Lock()
@@ -139,6 +167,7 @@ func (r *Relay) HandleWebSocket(w http.ResponseWriter, req *http.Request) {
 		log.Printf("upgrade: %v", err)
 		return
 	}
+	conn.SetReadLimit(maxMessageSize)
 
 	// Read the first message to determine role (host or client)
 	_, data, err := conn.ReadMessage()
@@ -176,7 +205,12 @@ func (r *Relay) handleHost(conn *websocket.Conn, code string) {
 	r.sessions[code] = sess
 	r.mu.Unlock()
 
+	configureKeepalive(conn)
+	done := make(chan struct{})
+	go startPinger(conn, &sess.hostMu, done)
+
 	defer func() {
+		close(done)
 		r.mu.Lock()
 		delete(r.sessions, code)
 		r.mu.Unlock()
@@ -224,19 +258,32 @@ func (r *Relay) handleClient(conn *websocket.Conn, code string, ip string) {
 		return
 	}
 
+	// Hold r.mu while looking up the session and setting the client so that
+	// a concurrent host disconnect cannot remove the session in between.
 	r.mu.Lock()
 	sess, exists := r.sessions[code]
-	r.mu.Unlock()
-
 	if !exists {
+		r.mu.Unlock()
 		sendError(conn, "session not found")
 		conn.Close()
 		return
 	}
-
 	sess.mu.Lock()
+	oldClient := sess.client
 	sess.client = conn
 	sess.mu.Unlock()
+	r.mu.Unlock()
+
+	// Notify and close the displaced client so it doesn't hang silently
+	if oldClient != nil {
+		sendError(oldClient, "replaced by another client")
+		oldClient.Close()
+	}
+
+	configureKeepalive(conn)
+	var clientWriteMu sync.Mutex
+	done := make(chan struct{})
+	go startPinger(conn, &clientWriteMu, done)
 
 	// Acknowledge to client that they joined successfully
 	sendJSON(conn, protocol.Message{
@@ -245,18 +292,19 @@ func (r *Relay) handleClient(conn *websocket.Conn, code string, ip string) {
 	})
 
 	// Notify host that client joined
-	sendJSON(sess.host, protocol.Message{
+	sess.sendToHost(protocol.Message{
 		Type:  protocol.MsgPeerEvent,
 		Event: "joined",
 	})
 
 	defer func() {
+		close(done)
 		conn.Close()
 		sess.mu.Lock()
 		sess.client = nil
 		sess.mu.Unlock()
 		// Notify host that client left
-		sendJSON(sess.host, protocol.Message{
+		sess.sendToHost(protocol.Message{
 			Type:  protocol.MsgPeerEvent,
 			Event: "left",
 		})
@@ -276,7 +324,51 @@ func (r *Relay) handleClient(conn *websocket.Conn, code string, ip string) {
 
 		// Forward input and key exchange messages to host
 		if msg.Type == protocol.MsgInput || msg.Type == protocol.MsgKeyExchange {
-			if err := sess.host.WriteMessage(websocket.TextMessage, data); err != nil {
+			sess.hostMu.Lock()
+			err := sess.host.WriteMessage(websocket.TextMessage, data)
+			sess.hostMu.Unlock()
+			if err != nil {
+				return
+			}
+		}
+	}
+}
+
+// sendToHost serializes writes to the host connection.
+func (s *session) sendToHost(msg protocol.Message) error {
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	s.hostMu.Lock()
+	defer s.hostMu.Unlock()
+	return s.host.WriteMessage(websocket.TextMessage, data)
+}
+
+// configureKeepalive sets up pong handling and an initial read deadline on a
+// connection. Each pong resets the deadline so idle connections are reaped.
+func configureKeepalive(conn *websocket.Conn) {
+	conn.SetReadDeadline(time.Now().Add(pongTimeout))
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(pongTimeout))
+		return nil
+	})
+}
+
+// startPinger sends periodic WebSocket pings until done is closed.
+// The write mutex mu must serialize all writes to conn.
+func startPinger(conn *websocket.Conn, mu *sync.Mutex, done <-chan struct{}) {
+	ticker := time.NewTicker(pingInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+			mu.Lock()
+			err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(5*time.Second))
+			mu.Unlock()
+			if err != nil {
 				return
 			}
 		}
