@@ -53,6 +53,11 @@ var joinCmd = &cobra.Command{
 
 			attempt = 0
 
+			// Display decrypted terminal output from the host
+			c.SetOnOutput(func(data []byte) {
+				os.Stdout.Write(data)
+			})
+
 			if firstConnect {
 				fmt.Printf("Connected to %s\n", sessionCode)
 				fmt.Println("You are now typing into the remote terminal.")

@@ -74,8 +74,18 @@ func runTerminalMode(code string) error {
 		h.UpdateTermSize(ws.Cols, ws.Rows)
 	}
 
+	// Open /dev/tty for terminal state management. We use a separate fd
+	// because os.Stdin gets closed to unblock the read loop on PTY exit,
+	// and term.Restore would fail on the closed fd.
+	tty, err := os.Open("/dev/tty")
+	if err != nil {
+		return fmt.Errorf("failed to open /dev/tty: %w", err)
+	}
+	defer tty.Close()
+	ttyFd := int(tty.Fd())
+
 	// Switch local terminal to raw mode
-	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
+	oldState, err := term.MakeRaw(ttyFd)
 	if err != nil {
 		return fmt.Errorf("failed to set raw mode: %w", err)
 	}
@@ -106,7 +116,7 @@ func runTerminalMode(code string) error {
 					// then restore the terminal to avoid garbled output.
 					h.Close()
 					h.ClearTerminalTitle()
-					term.Restore(int(os.Stdin.Fd()), oldState)
+					term.Restore(ttyFd, oldState)
 					return nil
 				}
 			}
@@ -120,7 +130,7 @@ func runTerminalMode(code string) error {
 	// then restore the terminal to avoid garbled output.
 	h.Close()
 	h.ClearTerminalTitle()
-	term.Restore(int(os.Stdin.Fd()), oldState)
+	term.Restore(ttyFd, oldState)
 	return nil
 }
 

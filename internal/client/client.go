@@ -24,7 +24,14 @@ type Client struct {
 	conn          *websocket.Conn
 	connMu        sync.Mutex
 	cryptoSession *crypto.Session
+	onOutput      func([]byte)
 	done          chan struct{}
+}
+
+// SetOnOutput registers a callback that is invoked with decrypted terminal
+// output from the host. Must be called before the read loop processes messages.
+func (c *Client) SetOnOutput(fn func([]byte)) {
+	c.onOutput = fn
 }
 
 // New creates a new Client that connects to the relay and joins a session.
@@ -135,10 +142,12 @@ func (c *Client) Done() <-chan struct{} {
 	return c.done
 }
 
-// readLoop reads and discards incoming messages until the connection closes.
+// readLoop reads incoming messages, delivers output to the callback, and
+// detects connection loss.
 func (c *Client) readLoop() {
 	for {
-		if _, _, err := c.conn.ReadMessage(); err != nil {
+		_, raw, err := c.conn.ReadMessage()
+		if err != nil {
 			select {
 			case <-c.done:
 				// Already closed
@@ -146,6 +155,27 @@ func (c *Client) readLoop() {
 				close(c.done)
 			}
 			return
+		}
+
+		var msg protocol.Message
+		if err := json.Unmarshal(raw, &msg); err != nil {
+			continue
+		}
+
+		switch msg.Type {
+		case protocol.MsgOutput:
+			if c.onOutput == nil {
+				continue
+			}
+			decoded, err := base64.StdEncoding.DecodeString(msg.Data)
+			if err != nil {
+				continue
+			}
+			plaintext, err := c.cryptoSession.Decrypt(decoded)
+			if err != nil {
+				continue
+			}
+			c.onOutput(plaintext)
 		}
 	}
 }
