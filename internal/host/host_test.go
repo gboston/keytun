@@ -393,6 +393,134 @@ func TestHostDoneClosesAfterClose(t *testing.T) {
 	}
 }
 
+func TestHostClientReconnectDoesNotPanic(t *testing.T) {
+	server := setupRelay(t)
+	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+
+	inj := &noOutputInjector{}
+	h, err := New(relayURL, "test-reconnect-01", inj)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer h.Close()
+
+	// First client connects and completes key exchange
+	clientConn1 := dialWS(t, server)
+	clientSess1 := simulateClientJoinWithKeyExchange(t, clientConn1, "test-reconnect-01")
+
+	// Send some input to confirm the session works
+	plaintext := []byte("first")
+	encrypted, err := clientSess1.Encrypt(plaintext)
+	if err != nil {
+		t.Fatalf("encrypt: %v", err)
+	}
+	encoded := base64.StdEncoding.EncodeToString(encrypted)
+	sendMsg(t, clientConn1, protocol.Message{
+		Type: protocol.MsgInput,
+		Data: encoded,
+	})
+
+	// First client disconnects
+	clientConn1.Close()
+
+	// Give the relay time to notice the disconnect and notify the host
+	time.Sleep(200 * time.Millisecond)
+
+	// Second client connects — this would panic before the fix because
+	// the key exchange handler would close the already-closed keyReady channel.
+	clientConn2 := dialWS(t, server)
+	defer clientConn2.Close()
+	clientSess2 := simulateClientJoinWithKeyExchange(t, clientConn2, "test-reconnect-01")
+
+	// Verify the new session works by sending input
+	plaintext2 := []byte("second")
+	encrypted2, err := clientSess2.Encrypt(plaintext2)
+	if err != nil {
+		t.Fatalf("encrypt: %v", err)
+	}
+	encoded2 := base64.StdEncoding.EncodeToString(encrypted2)
+	sendMsg(t, clientConn2, protocol.Message{
+		Type: protocol.MsgInput,
+		Data: encoded2,
+	})
+
+	// Verify the injector received input from both sessions
+	time.Sleep(200 * time.Millisecond)
+	inj.mu.Lock()
+	injected := string(inj.injected)
+	inj.mu.Unlock()
+	if !strings.Contains(injected, "first") {
+		t.Errorf("expected injector to contain 'first', got: %q", injected)
+	}
+	if !strings.Contains(injected, "second") {
+		t.Errorf("expected injector to contain 'second', got: %q", injected)
+	}
+}
+
+func TestHostSetsTerminalTitleOnStateChanges(t *testing.T) {
+	server := setupRelay(t)
+	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+
+	var localBuf safeBuffer
+	inj := &noOutputInjector{}
+	h, err := New(relayURL, "test-title-01", inj, &localBuf)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer h.Close()
+
+	// After creation, localOut should contain the "waiting" terminal title
+	time.Sleep(100 * time.Millisecond)
+	output := localBuf.String()
+	wantWaiting := "\x1b]0;keytun: test-title-01 (waiting)\x07"
+	if !strings.Contains(output, wantWaiting) {
+		t.Errorf("expected waiting title %q in output, got: %q", wantWaiting, output)
+	}
+
+	// Client joins — title should update to "connected"
+	clientConn := dialWS(t, server)
+	simulateClientJoinWithKeyExchange(t, clientConn, "test-title-01")
+
+	time.Sleep(200 * time.Millisecond)
+	output = localBuf.String()
+	wantConnected := "\x1b]0;keytun: test-title-01 (connected)\x07"
+	if !strings.Contains(output, wantConnected) {
+		t.Errorf("expected connected title %q in output, got: %q", wantConnected, output)
+	}
+
+	// Client disconnects — title should revert to "waiting"
+	clientConn.Close()
+	time.Sleep(300 * time.Millisecond)
+	output = localBuf.String()
+	// Should contain a second "waiting" title after the "connected" one
+	afterConnected := strings.LastIndex(output, wantConnected)
+	if afterConnected < 0 {
+		t.Fatal("connected title not found")
+	}
+	remainder := output[afterConnected+len(wantConnected):]
+	if !strings.Contains(remainder, wantWaiting) {
+		t.Errorf("expected waiting title after disconnect in output, got remainder: %q", remainder)
+	}
+}
+
+// safeBuffer is a concurrency-safe bytes buffer for capturing localOut in tests.
+type safeBuffer struct {
+	mu  sync.Mutex
+	buf strings.Builder
+}
+
+func (b *safeBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *safeBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
 func TestHostSendsBannerWhenNoOutput(t *testing.T) {
 	server := setupRelay(t)
 	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"

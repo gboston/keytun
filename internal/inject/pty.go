@@ -5,6 +5,7 @@ package inject
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/creack/pty"
 )
@@ -22,6 +23,9 @@ func NewPTY() (*PTYInjector, error) {
 		shell = "/bin/zsh"
 	}
 	cmd := exec.Command(shell)
+	// Set argv[0] to "-shellname" so the shell starts as a login shell,
+	// which sources profile/rc files (where aliases are defined).
+	cmd.Args[0] = "-" + filepath.Base(shell)
 	cmd.Env = os.Environ()
 	ptmx, err := pty.Start(cmd)
 	if err != nil {

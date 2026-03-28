@@ -5,6 +5,7 @@ package host
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"strings"
 	"sync"
@@ -69,6 +70,9 @@ func New(relayURL string, sessionCode string, injector inject.Injector, localOut
 		clientJoined: make(chan struct{}),
 	}
 
+	// Set initial terminal title showing the session is waiting for a client
+	h.setTerminalTitle("waiting")
+
 	// Only read output if the injector produces it (e.g. PTY mode)
 	if injector.HasOutput() {
 		if or, ok := injector.(inject.OutputReader); ok {
@@ -113,6 +117,24 @@ func (h *Host) writeMessage(msgType int, data []byte) error {
 	h.connMu.Lock()
 	defer h.connMu.Unlock()
 	return h.conn.WriteMessage(msgType, data)
+}
+
+// setTerminalTitle sets the terminal window/tab title via OSC escape sequence.
+func (h *Host) setTerminalTitle(status string) {
+	if h.localOut == nil {
+		return
+	}
+	title := fmt.Sprintf("\x1b]0;keytun: %s (%s)\x07", h.sessionCode, status)
+	io.WriteString(h.localOut, title)
+}
+
+// ClearTerminalTitle resets the terminal title to show the session code without a status.
+func (h *Host) ClearTerminalTitle() {
+	if h.localOut == nil {
+		return
+	}
+	title := fmt.Sprintf("\x1b]0;keytun: %s\x07", h.sessionCode)
+	io.WriteString(h.localOut, title)
 }
 
 // Close shuts down the host session and waits for all goroutines to finish.
@@ -269,7 +291,12 @@ func (h *Host) readRelayMessages() {
 			if err := h.cryptoSession.Complete(peerPub); err != nil {
 				continue
 			}
-			close(h.keyReady)
+			select {
+			case <-h.keyReady:
+				// already closed from a previous key exchange
+			default:
+				close(h.keyReady)
+			}
 
 			// In system mode, send a banner so the client knows they
 			// will only see echoed keystrokes, not application output.
@@ -281,6 +308,7 @@ func (h *Host) readRelayMessages() {
 			var banner string
 			if msg.Event == "joined" {
 				h.clientJoinedOnce.Do(func() { close(h.clientJoined) })
+				h.setTerminalTitle("connected")
 				banner = "\r\n[keytun] client connected\r\n"
 				// Start key exchange: create session and send our public key
 				sess, err := crypto.NewSession()
@@ -301,6 +329,7 @@ func (h *Host) readRelayMessages() {
 					h.SendResize(h.termCols, h.termRows)
 				}
 			} else if msg.Event == "left" {
+				h.setTerminalTitle("waiting")
 				banner = "\r\n[keytun] client disconnected\r\n"
 			}
 			if banner != "" {

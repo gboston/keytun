@@ -98,6 +98,7 @@ func runTerminalMode(code string) error {
 					// Close host first so goroutines stop writing to stdout,
 					// then restore the terminal to avoid garbled output.
 					h.Close()
+					h.ClearTerminalTitle()
 					term.Restore(int(os.Stdin.Fd()), oldState)
 					return nil
 				}
@@ -111,6 +112,7 @@ func runTerminalMode(code string) error {
 	// Close host first so goroutines stop writing to stdout,
 	// then restore the terminal to avoid garbled output.
 	h.Close()
+	h.ClearTerminalTitle()
 	term.Restore(int(os.Stdin.Fd()), oldState)
 	return nil
 }
