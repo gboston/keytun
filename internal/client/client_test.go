@@ -426,7 +426,9 @@ func TestClientSetOnOutputReceivesOutput(t *testing.T) {
 		Type: protocol.MsgOutput,
 		Data: encoded,
 	})
-	host.WriteMessage(websocket.TextMessage, data)
+	if err := host.WriteMessage(websocket.TextMessage, data); err != nil {
+		t.Fatalf("host.WriteMessage: %v", err)
+	}
 
 	// Client's readLoop should invoke the callback
 	select {
@@ -455,6 +457,7 @@ func TestClientReadLoopCloseDoneOnDisconnect(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
+	defer c.Close()
 
 	result := <-kxCh
 	if result.err != nil {

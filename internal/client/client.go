@@ -25,13 +25,17 @@ type Client struct {
 	connMu        sync.Mutex
 	cryptoSession *crypto.Session
 	onOutput      func([]byte)
+	onOutputMu    sync.RWMutex
 	done          chan struct{}
+	closeOnce     sync.Once
 }
 
 // SetOnOutput registers a callback that is invoked with decrypted terminal
 // output from the host. Must be called before the read loop processes messages.
 func (c *Client) SetOnOutput(fn func([]byte)) {
+	c.onOutputMu.Lock()
 	c.onOutput = fn
+	c.onOutputMu.Unlock()
 }
 
 // New creates a new Client that connects to the relay and joins a session.
@@ -148,12 +152,7 @@ func (c *Client) readLoop() {
 	for {
 		_, raw, err := c.conn.ReadMessage()
 		if err != nil {
-			select {
-			case <-c.done:
-				// Already closed
-			default:
-				close(c.done)
-			}
+			c.Close()
 			return
 		}
 
@@ -164,7 +163,10 @@ func (c *Client) readLoop() {
 
 		switch msg.Type {
 		case protocol.MsgOutput:
-			if c.onOutput == nil {
+			c.onOutputMu.RLock()
+			fn := c.onOutput
+			c.onOutputMu.RUnlock()
+			if fn == nil {
 				continue
 			}
 			decoded, err := base64.StdEncoding.DecodeString(msg.Data)
@@ -175,7 +177,7 @@ func (c *Client) readLoop() {
 			if err != nil {
 				continue
 			}
-			c.onOutput(plaintext)
+			fn(plaintext)
 		}
 	}
 }
@@ -221,11 +223,8 @@ func (c *Client) SendInput(input []byte) error {
 
 // Close shuts down the client connection.
 func (c *Client) Close() {
-	select {
-	case <-c.done:
-		return
-	default:
+	c.closeOnce.Do(func() {
 		close(c.done)
-	}
-	c.conn.Close()
+		c.conn.Close()
+	})
 }

@@ -21,7 +21,9 @@ import (
 // generateClientID returns an 8-character hex string from crypto/rand.
 func generateClientID() string {
 	b := make([]byte, 4)
-	crypto_rand.Read(b)
+	if _, err := crypto_rand.Read(b); err != nil {
+		log.Fatalf("crypto/rand: %v", err)
+	}
 	return hex.EncodeToString(b)
 }
 
@@ -147,8 +149,12 @@ func (r *Relay) sweepStaleLimiters() {
 // read loops to exit and defer-based cleanup to run.
 func (r *Relay) CloseAllSessions() {
 	r.mu.Lock()
-	defer r.mu.Unlock()
+	snapshot := make([]*session, 0, len(r.sessions))
 	for _, sess := range r.sessions {
+		snapshot = append(snapshot, sess)
+	}
+	r.mu.Unlock()
+	for _, sess := range snapshot {
 		sess.host.Close()
 		sess.clientMu.RLock()
 		for _, c := range sess.clients {
@@ -252,12 +258,16 @@ func (r *Relay) handleHost(conn *websocket.Conn, code string) {
 			if msg.ClientID != "" {
 				// Targeted: send to a specific client
 				if c, ok := sess.clients[msg.ClientID]; ok {
-					c.WriteMessage(websocket.TextMessage, data)
+					if err := c.WriteMessage(websocket.TextMessage, data); err != nil {
+						log.Printf("write to client %s: %v", msg.ClientID, err)
+					}
 				}
 			} else {
 				// Broadcast: send to all clients
 				for _, c := range sess.clients {
-					c.WriteMessage(websocket.TextMessage, data)
+					if err := c.WriteMessage(websocket.TextMessage, data); err != nil {
+						log.Printf("write to client: %v", err)
+					}
 				}
 			}
 			sess.clientMu.RUnlock()
@@ -304,11 +314,13 @@ func (r *Relay) handleClient(conn *websocket.Conn, code string, ip string) {
 	sess.clientMu.Unlock()
 
 	// Notify host that client joined (with ClientID)
-	sess.sendToHost(protocol.Message{
+	if err := sess.sendToHost(protocol.Message{
 		Type:     protocol.MsgPeerEvent,
 		Event:    "joined",
 		ClientID: clientID,
-	})
+	}); err != nil {
+		log.Printf("notify host of client join: %v", err)
+	}
 
 	defer func() {
 		close(done)
@@ -317,11 +329,13 @@ func (r *Relay) handleClient(conn *websocket.Conn, code string, ip string) {
 		delete(sess.clients, clientID)
 		sess.clientMu.Unlock()
 		// Notify host that client left (with ClientID)
-		sess.sendToHost(protocol.Message{
+		if err := sess.sendToHost(protocol.Message{
 			Type:     protocol.MsgPeerEvent,
 			Event:    "left",
 			ClientID: clientID,
-		})
+		}); err != nil {
+			log.Printf("notify host of client leave: %v", err)
+		}
 	}()
 
 	// Read messages from client and forward to host with ClientID injected

@@ -29,12 +29,14 @@ type Host struct {
 	connMu           sync.Mutex
 	injector         inject.Injector
 	localOut         io.Writer
+	localOutMu       sync.Mutex
 	outputBuf        strings.Builder
 	outputMu         sync.Mutex
 	cryptoSessions   map[string]*crypto.Session // clientID -> crypto session
 	cryptoMu         sync.RWMutex
 	keyReady         chan struct{}
 	done             chan struct{}
+	closeOnce        sync.Once
 	wg               sync.WaitGroup
 	clientJoined     chan struct{}
 	clientJoinedOnce sync.Once
@@ -210,7 +212,9 @@ func (h *Host) setTerminalTitle(status string) {
 		return
 	}
 	title := fmt.Sprintf("\x1b]0;keytun: %s (%s)\x07", h.sessionCode, status)
+	h.localOutMu.Lock()
 	io.WriteString(h.localOut, title)
+	h.localOutMu.Unlock()
 }
 
 // ClearTerminalTitle resets the terminal title to show the session code without a status.
@@ -219,20 +223,19 @@ func (h *Host) ClearTerminalTitle() {
 		return
 	}
 	title := fmt.Sprintf("\x1b]0;keytun: %s\x07", h.sessionCode)
+	h.localOutMu.Lock()
 	io.WriteString(h.localOut, title)
+	h.localOutMu.Unlock()
 }
 
 // Close shuts down the host session and waits for all goroutines to finish.
 func (h *Host) Close() {
-	select {
-	case <-h.done:
-		return
-	default:
+	h.closeOnce.Do(func() {
 		close(h.done)
-	}
-	h.conn.Close()
-	h.injector.Close()
-	h.wg.Wait()
+		h.conn.Close()
+		h.injector.Close()
+		h.wg.Wait()
+	})
 }
 
 // Done returns a channel that is closed when the host session ends.
@@ -338,7 +341,9 @@ func (h *Host) readOutput(or inject.OutputReader) {
 
 		// Write to local output (stdout) if configured
 		if h.localOut != nil {
+			h.localOutMu.Lock()
 			h.localOut.Write(buf[:n])
+			h.localOutMu.Unlock()
 		}
 
 		// Buffer for test readback
@@ -485,7 +490,9 @@ func (h *Host) readRelayMessages() {
 			}
 			if banner != "" {
 				if h.localOut != nil {
+					h.localOutMu.Lock()
 					io.WriteString(h.localOut, banner)
+					h.localOutMu.Unlock()
 				}
 				h.outputMu.Lock()
 				h.outputBuf.WriteString(banner)
