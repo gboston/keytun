@@ -64,6 +64,26 @@ func New(relayURL string, sessionCode string, injector inject.Injector, localOut
 		return nil, err
 	}
 
+	// Wait for relay to confirm the session is registered
+	_, ackData, err := conn.ReadMessage()
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("waiting for registration ack: %w", err)
+	}
+	var ack protocol.Message
+	if err := json.Unmarshal(ackData, &ack); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("invalid registration ack: %w", err)
+	}
+	if ack.Type == protocol.MsgError {
+		conn.Close()
+		return nil, fmt.Errorf("relay error: %s", ack.ErrMessage)
+	}
+	if ack.Type != protocol.MsgHostRegistered {
+		conn.Close()
+		return nil, fmt.Errorf("unexpected message type: %s", ack.Type)
+	}
+
 	var out io.Writer
 	if len(localOut) > 0 && localOut[0] != nil {
 		out = localOut[0]

@@ -216,6 +216,13 @@ func (r *Relay) handleHost(conn *websocket.Conn, code string) {
 		sendError(conn, "session code already in use")
 		return
 	}
+	// Acknowledge registration before the session is visible to other goroutines,
+	// to avoid a data race with sendToHost (which also writes to conn).
+	sendJSON(conn, protocol.Message{
+		Type:    protocol.MsgHostRegistered,
+		Session: code,
+	})
+
 	sess := &session{
 		host:    conn,
 		clients: make(map[string]*websocket.Conn),

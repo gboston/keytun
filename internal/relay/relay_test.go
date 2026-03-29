@@ -49,6 +49,21 @@ func readMsg(t *testing.T, conn *websocket.Conn) protocol.Message {
 	return msg
 }
 
+// registerHost dials the relay, sends host_register, and reads the host_registered ack.
+func registerHost(t *testing.T, server *httptest.Server, session string) *websocket.Conn {
+	t.Helper()
+	conn := dialWS(t, server)
+	sendMsg(t, conn, protocol.Message{
+		Type:    protocol.MsgHostRegister,
+		Session: session,
+	})
+	ack := readMsg(t, conn)
+	if ack.Type != protocol.MsgHostRegistered {
+		t.Fatalf("expected host_registered, got %+v", ack)
+	}
+	return conn
+}
+
 func newTestServer(t *testing.T) (*httptest.Server, *Relay) {
 	t.Helper()
 	r := New()
@@ -63,12 +78,8 @@ func TestHostRegisterAndClientJoin(t *testing.T) {
 	server, _ := newTestServer(t)
 
 	// Host registers
-	host := dialWS(t, server)
+	host := registerHost(t, server, "test-fox-42")
 	defer host.Close()
-	sendMsg(t, host, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-fox-42",
-	})
 
 	// Client joins
 	client := dialWS(t, server)
@@ -88,12 +99,8 @@ func TestHostRegisterAndClientJoin(t *testing.T) {
 func TestInputFlowsFromClientToHost(t *testing.T) {
 	server, _ := newTestServer(t)
 
-	host := dialWS(t, server)
+	host := registerHost(t, server, "test-fox-43")
 	defer host.Close()
-	sendMsg(t, host, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-fox-43",
-	})
 
 	client := dialWS(t, server)
 	defer client.Close()
@@ -124,12 +131,8 @@ func TestInputFlowsFromClientToHost(t *testing.T) {
 func TestOutputFlowsFromHostToClient(t *testing.T) {
 	server, _ := newTestServer(t)
 
-	host := dialWS(t, server)
+	host := registerHost(t, server, "test-fox-44")
 	defer host.Close()
-	sendMsg(t, host, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-fox-44",
-	})
 
 	client := dialWS(t, server)
 	defer client.Close()
@@ -197,11 +200,7 @@ func waitFor(t *testing.T, condition func() bool, timeout time.Duration, msg str
 func TestHostDisconnectCleansUpSession(t *testing.T) {
 	server, r := newTestServer(t)
 
-	host := dialWS(t, server)
-	sendMsg(t, host, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-fox-45",
-	})
+	host := registerHost(t, server, "test-fox-45")
 
 	// Wait for session to be registered server-side
 	waitFor(t, func() bool { return r.HasSession("test-fox-45") }, 2*time.Second,
@@ -218,12 +217,8 @@ func TestHostDisconnectCleansUpSession(t *testing.T) {
 func TestClientDisconnectSendsPeerEvent(t *testing.T) {
 	server, _ := newTestServer(t)
 
-	host := dialWS(t, server)
+	host := registerHost(t, server, "test-fox-46")
 	defer host.Close()
-	sendMsg(t, host, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-fox-46",
-	})
 
 	client := dialWS(t, server)
 	sendMsg(t, client, protocol.Message{
@@ -253,12 +248,8 @@ func TestClientDisconnectSendsPeerEvent(t *testing.T) {
 func TestKeyExchangeFlowsBidirectionally(t *testing.T) {
 	server, _ := newTestServer(t)
 
-	host := dialWS(t, server)
+	host := registerHost(t, server, "test-fox-kx")
 	defer host.Close()
-	sendMsg(t, host, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-fox-kx",
-	})
 
 	client := dialWS(t, server)
 	defer client.Close()
@@ -301,12 +292,8 @@ func TestKeyExchangeFlowsBidirectionally(t *testing.T) {
 func TestResizeFlowsFromHostToClient(t *testing.T) {
 	server, _ := newTestServer(t)
 
-	host := dialWS(t, server)
+	host := registerHost(t, server, "test-fox-resize")
 	defer host.Close()
-	sendMsg(t, host, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-fox-resize",
-	})
 
 	client := dialWS(t, server)
 	defer client.Close()
@@ -393,9 +380,8 @@ func TestRateLimitBlocksExcessiveJoinAttempts(t *testing.T) {
 	t.Cleanup(func() { server.Close() })
 
 	// Register a host so joins can succeed (avoids "session not found" for first attempts)
-	host := dialWS(t, server)
+	host := registerHost(t, server, "rate-test-01")
 	defer host.Close()
-	sendMsg(t, host, protocol.Message{Type: protocol.MsgHostRegister, Session: "rate-test-01"})
 
 	// Exhaust the burst allowance
 	for i := 0; i < r.joinBurst; i++ {
@@ -432,9 +418,8 @@ func TestRateLimitUsesCFConnectingIP(t *testing.T) {
 	server := httptest.NewServer(mux)
 	t.Cleanup(func() { server.Close() })
 
-	host := dialWS(t, server)
+	host := registerHost(t, server, "cf-rate-test")
 	defer host.Close()
-	sendMsg(t, host, protocol.Message{Type: protocol.MsgHostRegister, Session: "cf-rate-test"})
 
 	// Exhaust burst for a specific CF IP
 	cfHeader := http.Header{"CF-Connecting-IP": []string{"5.6.7.8"}}
@@ -573,12 +558,8 @@ func TestSweepStaleLimiters(t *testing.T) {
 func TestMultipleClientsJoinSameSession(t *testing.T) {
 	server, _ := newTestServer(t)
 
-	host := dialWS(t, server)
+	host := registerHost(t, server, "test-multi-01")
 	defer host.Close()
-	sendMsg(t, host, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-multi-01",
-	})
 
 	// Client A joins
 	clientA := dialWS(t, server)
@@ -621,12 +602,8 @@ func TestMultipleClientsJoinSameSession(t *testing.T) {
 func TestInputRoutedWithClientID(t *testing.T) {
 	server, _ := newTestServer(t)
 
-	host := dialWS(t, server)
+	host := registerHost(t, server, "test-multi-02")
 	defer host.Close()
-	sendMsg(t, host, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-multi-02",
-	})
 
 	// Two clients join
 	clientA := dialWS(t, server)
@@ -671,12 +648,8 @@ func TestInputRoutedWithClientID(t *testing.T) {
 func TestTargetedOutputRoutesToSpecificClient(t *testing.T) {
 	server, _ := newTestServer(t)
 
-	host := dialWS(t, server)
+	host := registerHost(t, server, "test-multi-03")
 	defer host.Close()
-	sendMsg(t, host, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-multi-03",
-	})
 
 	clientA := dialWS(t, server)
 	defer clientA.Close()
@@ -721,12 +694,8 @@ func TestTargetedOutputRoutesToSpecificClient(t *testing.T) {
 func TestBroadcastOutputRoutesToAllClients(t *testing.T) {
 	server, _ := newTestServer(t)
 
-	host := dialWS(t, server)
+	host := registerHost(t, server, "test-multi-04")
 	defer host.Close()
-	sendMsg(t, host, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-multi-04",
-	})
 
 	clientA := dialWS(t, server)
 	defer clientA.Close()
@@ -767,12 +736,8 @@ func TestBroadcastOutputRoutesToAllClients(t *testing.T) {
 func TestClientDisconnectSendsClientIDInPeerEvent(t *testing.T) {
 	server, _ := newTestServer(t)
 
-	host := dialWS(t, server)
+	host := registerHost(t, server, "test-multi-05")
 	defer host.Close()
-	sendMsg(t, host, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-multi-05",
-	})
 
 	client := dialWS(t, server)
 	sendMsg(t, client, protocol.Message{
@@ -796,11 +761,7 @@ func TestClientDisconnectSendsClientIDInPeerEvent(t *testing.T) {
 func TestHostDisconnectClosesAllClients(t *testing.T) {
 	server, _ := newTestServer(t)
 
-	host := dialWS(t, server)
-	sendMsg(t, host, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-multi-06",
-	})
+	host := registerHost(t, server, "test-multi-06")
 
 	clientA := dialWS(t, server)
 	defer clientA.Close()
@@ -839,12 +800,8 @@ func TestHostDisconnectClosesAllClients(t *testing.T) {
 func TestDuplicateSessionCode(t *testing.T) {
 	server, _ := newTestServer(t)
 
-	host1 := dialWS(t, server)
+	host1 := registerHost(t, server, "test-fox-47")
 	defer host1.Close()
-	sendMsg(t, host1, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-fox-47",
-	})
 
 	// Second host tries same code
 	host2 := dialWS(t, server)
@@ -863,12 +820,8 @@ func TestDuplicateSessionCode(t *testing.T) {
 func TestSecondClientDoesNotDisplaceFirst(t *testing.T) {
 	server, _ := newTestServer(t)
 
-	host := dialWS(t, server)
+	host := registerHost(t, server, "test-fox-coexist")
 	defer host.Close()
-	sendMsg(t, host, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-fox-coexist",
-	})
 
 	// First client joins
 	client1 := dialWS(t, server)
@@ -905,12 +858,8 @@ func TestCloseAllSessionsClosesConnections(t *testing.T) {
 	server, r := newTestServer(t)
 
 	// Register a host
-	host := dialWS(t, server)
+	host := registerHost(t, server, "test-close-all-01")
 	defer host.Close()
-	sendMsg(t, host, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-close-all-01",
-	})
 
 	// Client joins
 	client := dialWS(t, server)
@@ -944,19 +893,11 @@ func TestCloseAllSessionsMultipleSessions(t *testing.T) {
 	server, r := newTestServer(t)
 
 	// Register two hosts with different sessions
-	host1 := dialWS(t, server)
+	host1 := registerHost(t, server, "test-close-all-02a")
 	defer host1.Close()
-	sendMsg(t, host1, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-close-all-02a",
-	})
 
-	host2 := dialWS(t, server)
+	host2 := registerHost(t, server, "test-close-all-02b")
 	defer host2.Close()
-	sendMsg(t, host2, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-close-all-02b",
-	})
 
 	waitFor(t, func() bool {
 		return r.HasSession("test-close-all-02a") && r.HasSession("test-close-all-02b")
@@ -989,12 +930,8 @@ func TestRealIPFallsBackToRawRemoteAddr(t *testing.T) {
 func TestHostSendsInvalidJSONToRelay(t *testing.T) {
 	server, _ := newTestServer(t)
 
-	host := dialWS(t, server)
+	host := registerHost(t, server, "test-badjson-host")
 	defer host.Close()
-	sendMsg(t, host, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-badjson-host",
-	})
 
 	client := dialWS(t, server)
 	defer client.Close()
@@ -1025,12 +962,8 @@ func TestHostSendsInvalidJSONToRelay(t *testing.T) {
 func TestClientSendsInvalidJSONToRelay(t *testing.T) {
 	server, _ := newTestServer(t)
 
-	host := dialWS(t, server)
+	host := registerHost(t, server, "test-badjson-client")
 	defer host.Close()
-	sendMsg(t, host, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-badjson-client",
-	})
 
 	client := dialWS(t, server)
 	defer client.Close()
@@ -1061,12 +994,8 @@ func TestClientSendsInvalidJSONToRelay(t *testing.T) {
 func TestOversizedMessageRejected(t *testing.T) {
 	server, _ := newTestServer(t)
 
-	host := dialWS(t, server)
+	host := registerHost(t, server, "test-fox-oversize")
 	defer host.Close()
-	sendMsg(t, host, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-fox-oversize",
-	})
 
 	client := dialWS(t, server)
 	defer client.Close()

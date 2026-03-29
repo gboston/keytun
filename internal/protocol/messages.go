@@ -6,8 +6,9 @@ package protocol
 type MessageType string
 
 const (
-	MsgHostRegister MessageType = "host_register"
-	MsgClientJoin   MessageType = "client_join"
+	MsgHostRegister   MessageType = "host_register"
+	MsgHostRegistered MessageType = "host_registered"
+	MsgClientJoin     MessageType = "client_join"
 	MsgInput        MessageType = "input"
 	MsgOutput       MessageType = "output"
 	MsgError        MessageType = "error"

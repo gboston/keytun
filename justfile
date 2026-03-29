@@ -12,6 +12,9 @@ build-linux:
 test:
     go test ./... -v
 
+test-ci:
+    docker run --rm -e SHELL=/bin/bash -v {{justfile_directory()}}:/app -w /app golang:1.25 go test ./internal/... -v -count=1
+
 clean:
     rm -f {{binary}}
 

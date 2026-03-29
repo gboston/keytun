@@ -62,6 +62,21 @@ func readMsg(t *testing.T, conn *websocket.Conn) protocol.Message {
 	return msg
 }
 
+// registerHost dials the relay, sends host_register, and reads the host_registered ack.
+func registerHost(t *testing.T, server *httptest.Server, session string) *websocket.Conn {
+	t.Helper()
+	conn := dialWS(t, server)
+	sendMsg(t, conn, protocol.Message{
+		Type:    protocol.MsgHostRegister,
+		Session: session,
+	})
+	ack := readMsg(t, conn)
+	if ack.Type != protocol.MsgHostRegistered {
+		t.Fatalf("expected host_registered, got %+v", ack)
+	}
+	return conn
+}
+
 // hostKeyExchangeResult holds the result of a background host key exchange.
 type hostKeyExchangeResult struct {
 	session *crypto.Session
@@ -119,12 +134,8 @@ func TestClientConnectsToSession(t *testing.T) {
 	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 
 	// Register a host first
-	host := dialWS(t, server)
+	host := registerHost(t, server, "test-rat-10")
 	defer host.Close()
-	sendMsg(t, host, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-rat-10",
-	})
 
 	// Start host-side key exchange in background before client.New() blocks
 	kxCh := startHostKeyExchange(t, host)
@@ -145,12 +156,8 @@ func TestClientSendsInput(t *testing.T) {
 	server := setupRelay(t)
 	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 
-	host := dialWS(t, server)
+	host := registerHost(t, server, "test-rat-11")
 	defer host.Close()
-	sendMsg(t, host, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-rat-11",
-	})
 
 	kxCh := startHostKeyExchange(t, host)
 
@@ -203,12 +210,8 @@ func TestClientDoneClosesAfterClose(t *testing.T) {
 	server := setupRelay(t)
 	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 
-	host := dialWS(t, server)
+	host := registerHost(t, server, "test-rat-done")
 	defer host.Close()
-	sendMsg(t, host, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-rat-done",
-	})
 
 	kxCh := startHostKeyExchange(t, host)
 
@@ -389,12 +392,8 @@ func TestClientSetOnOutputReceivesOutput(t *testing.T) {
 	server := setupRelay(t)
 	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 
-	host := dialWS(t, server)
+	host := registerHost(t, server, "test-rat-output")
 	defer host.Close()
-	sendMsg(t, host, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-rat-output",
-	})
 
 	kxCh := startHostKeyExchange(t, host)
 
@@ -445,11 +444,7 @@ func TestClientReadLoopCloseDoneOnDisconnect(t *testing.T) {
 	server := setupRelay(t)
 	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 
-	host := dialWS(t, server)
-	sendMsg(t, host, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-rat-readloop-dc",
-	})
+	host := registerHost(t, server, "test-rat-readloop-dc")
 
 	kxCh := startHostKeyExchange(t, host)
 
@@ -479,12 +474,8 @@ func TestClientSendsControlSequences(t *testing.T) {
 	server := setupRelay(t)
 	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 
-	host := dialWS(t, server)
+	host := registerHost(t, server, "test-rat-12")
 	defer host.Close()
-	sendMsg(t, host, protocol.Message{
-		Type:    protocol.MsgHostRegister,
-		Session: "test-rat-12",
-	})
 
 	kxCh := startHostKeyExchange(t, host)
 
