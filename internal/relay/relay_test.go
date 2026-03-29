@@ -901,6 +901,163 @@ func TestSecondClientDoesNotDisplaceFirst(t *testing.T) {
 	}
 }
 
+func TestCloseAllSessionsClosesConnections(t *testing.T) {
+	server, r := newTestServer(t)
+
+	// Register a host
+	host := dialWS(t, server)
+	defer host.Close()
+	sendMsg(t, host, protocol.Message{
+		Type:    protocol.MsgHostRegister,
+		Session: "test-close-all-01",
+	})
+
+	// Client joins
+	client := dialWS(t, server)
+	defer client.Close()
+	sendMsg(t, client, protocol.Message{
+		Type:    protocol.MsgClientJoin,
+		Session: "test-close-all-01",
+	})
+
+	// Read peer_event on host, session_joined on client
+	readMsg(t, host)
+	readMsg(t, client)
+
+	// Close all sessions
+	r.CloseAllSessions()
+
+	// Both connections should be closed
+	host.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, _, err := host.ReadMessage()
+	if err == nil {
+		t.Error("host connection should be closed after CloseAllSessions")
+	}
+	client.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, _, err = client.ReadMessage()
+	if err == nil {
+		t.Error("client connection should be closed after CloseAllSessions")
+	}
+}
+
+func TestCloseAllSessionsMultipleSessions(t *testing.T) {
+	server, r := newTestServer(t)
+
+	// Register two hosts with different sessions
+	host1 := dialWS(t, server)
+	defer host1.Close()
+	sendMsg(t, host1, protocol.Message{
+		Type:    protocol.MsgHostRegister,
+		Session: "test-close-all-02a",
+	})
+
+	host2 := dialWS(t, server)
+	defer host2.Close()
+	sendMsg(t, host2, protocol.Message{
+		Type:    protocol.MsgHostRegister,
+		Session: "test-close-all-02b",
+	})
+
+	waitFor(t, func() bool {
+		return r.HasSession("test-close-all-02a") && r.HasSession("test-close-all-02b")
+	}, 2*time.Second, "both sessions should exist")
+
+	r.CloseAllSessions()
+
+	// Both hosts should have their connections closed
+	host1.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, _, err := host1.ReadMessage()
+	if err == nil {
+		t.Error("host1 connection should be closed")
+	}
+	host2.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, _, err = host2.ReadMessage()
+	if err == nil {
+		t.Error("host2 connection should be closed")
+	}
+}
+
+func TestRealIPFallsBackToRawRemoteAddr(t *testing.T) {
+	// When RemoteAddr has no port (no colon), SplitHostPort returns empty ip
+	req, _ := http.NewRequest("GET", "/ws", nil)
+	req.RemoteAddr = "bad-addr"
+	if got := realIP(req); got != "bad-addr" {
+		t.Errorf("realIP = %q, want %q", got, "bad-addr")
+	}
+}
+
+func TestHostSendsInvalidJSONToRelay(t *testing.T) {
+	server, _ := newTestServer(t)
+
+	host := dialWS(t, server)
+	defer host.Close()
+	sendMsg(t, host, protocol.Message{
+		Type:    protocol.MsgHostRegister,
+		Session: "test-badjson-host",
+	})
+
+	client := dialWS(t, server)
+	defer client.Close()
+	sendMsg(t, client, protocol.Message{
+		Type:    protocol.MsgClientJoin,
+		Session: "test-badjson-host",
+	})
+
+	// Read peer_event on host, session_joined on client
+	readMsg(t, host)
+	readMsg(t, client)
+
+	// Host sends invalid JSON — relay should silently skip it, not crash
+	host.WriteMessage(websocket.TextMessage, []byte("not valid json"))
+
+	// Host can still send valid messages after that
+	sendMsg(t, host, protocol.Message{
+		Type: protocol.MsgOutput,
+		Data: "YWZ0ZXI=",
+	})
+
+	msg := readMsg(t, client)
+	if msg.Type != protocol.MsgOutput || msg.Data != "YWZ0ZXI=" {
+		t.Errorf("expected output after invalid JSON, got %+v", msg)
+	}
+}
+
+func TestClientSendsInvalidJSONToRelay(t *testing.T) {
+	server, _ := newTestServer(t)
+
+	host := dialWS(t, server)
+	defer host.Close()
+	sendMsg(t, host, protocol.Message{
+		Type:    protocol.MsgHostRegister,
+		Session: "test-badjson-client",
+	})
+
+	client := dialWS(t, server)
+	defer client.Close()
+	sendMsg(t, client, protocol.Message{
+		Type:    protocol.MsgClientJoin,
+		Session: "test-badjson-client",
+	})
+
+	// Read peer_event on host, session_joined on client
+	readMsg(t, host)
+	readMsg(t, client)
+
+	// Client sends invalid JSON — relay should skip it
+	client.WriteMessage(websocket.TextMessage, []byte("{bad"))
+
+	// Client can still send valid input after that
+	sendMsg(t, client, protocol.Message{
+		Type: protocol.MsgInput,
+		Data: "cmVjb3Zlcg==",
+	})
+
+	msg := readMsg(t, host)
+	if msg.Type != protocol.MsgInput || msg.Data != "cmVjb3Zlcg==" {
+		t.Errorf("expected input after invalid JSON, got %+v", msg)
+	}
+}
+
 func TestOversizedMessageRejected(t *testing.T) {
 	server, _ := newTestServer(t)
 

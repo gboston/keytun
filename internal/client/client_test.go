@@ -385,6 +385,93 @@ func TestClientNewInvalidPeerPublicKey(t *testing.T) {
 	}
 }
 
+func TestClientSetOnOutputReceivesOutput(t *testing.T) {
+	server := setupRelay(t)
+	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+
+	host := dialWS(t, server)
+	defer host.Close()
+	sendMsg(t, host, protocol.Message{
+		Type:    protocol.MsgHostRegister,
+		Session: "test-rat-output",
+	})
+
+	kxCh := startHostKeyExchange(t, host)
+
+	c, err := New(relayURL, "test-rat-output")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer c.Close()
+
+	result := <-kxCh
+	if result.err != nil {
+		t.Fatalf("host key exchange: %v", result.err)
+	}
+
+	// Register output callback
+	outputCh := make(chan []byte, 10)
+	c.SetOnOutput(func(data []byte) {
+		outputCh <- append([]byte(nil), data...)
+	})
+
+	// Host sends encrypted output to the client
+	plaintext := []byte("hello from host")
+	encrypted, err := result.session.Encrypt(plaintext)
+	if err != nil {
+		t.Fatalf("encrypt: %v", err)
+	}
+	encoded := base64.StdEncoding.EncodeToString(encrypted)
+	data, _ := json.Marshal(protocol.Message{
+		Type: protocol.MsgOutput,
+		Data: encoded,
+	})
+	host.WriteMessage(websocket.TextMessage, data)
+
+	// Client's readLoop should invoke the callback
+	select {
+	case got := <-outputCh:
+		if string(got) != "hello from host" {
+			t.Errorf("output = %q, want %q", string(got), "hello from host")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for output callback")
+	}
+}
+
+func TestClientReadLoopCloseDoneOnDisconnect(t *testing.T) {
+	server := setupRelay(t)
+	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+
+	host := dialWS(t, server)
+	sendMsg(t, host, protocol.Message{
+		Type:    protocol.MsgHostRegister,
+		Session: "test-rat-readloop-dc",
+	})
+
+	kxCh := startHostKeyExchange(t, host)
+
+	c, err := New(relayURL, "test-rat-readloop-dc")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	result := <-kxCh
+	if result.err != nil {
+		t.Fatalf("host key exchange: %v", result.err)
+	}
+
+	// Host disconnects — readLoop should detect and close done channel
+	host.Close()
+
+	select {
+	case <-c.Done():
+		// expected
+	case <-time.After(5 * time.Second):
+		t.Fatal("Done channel not closed after host disconnect")
+	}
+}
+
 func TestClientSendsControlSequences(t *testing.T) {
 	server := setupRelay(t)
 	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
