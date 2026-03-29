@@ -45,6 +45,10 @@ type Host struct {
 	termRows         uint16
 	termMu           sync.Mutex
 
+	// Session password: mixed into HKDF salt during key derivation.
+	// Both host and client must use the same password for decryption to work.
+	password         string
+
 	// Activity pulse: signals input activity for terminal title updates
 	activityCh       chan struct{}
 
@@ -142,6 +146,12 @@ func New(relayURL string, sessionCode string, injector inject.Injector, localOut
 	go h.readRelayMessages()
 
 	return h, nil
+}
+
+// SetPassword sets a session password that clients must match to connect.
+// Must be called before any client joins.
+func (h *Host) SetPassword(password string) {
+	h.password = password
 }
 
 // SessionCode returns the session code for this host.
@@ -527,11 +537,50 @@ func (h *Host) readRelayMessages() {
 				h.cryptoMu.Unlock()
 				continue
 			}
-			err = sess.Complete(peerPub)
+			err = sess.Complete(peerPub, h.password)
 			h.cryptoMu.Unlock()
 			if err != nil {
 				continue
 			}
+
+			// Send our verify token so the client can confirm key agreement
+			verifyToken, err := sess.VerifyToken()
+			if err != nil {
+				continue
+			}
+			verifyMsg := protocol.Message{
+				Type:     protocol.MsgVerify,
+				Data:     base64.StdEncoding.EncodeToString(verifyToken),
+				ClientID: msg.ClientID,
+			}
+			verifyData, _ := json.Marshal(verifyMsg)
+			h.writeMessage(websocket.TextMessage, verifyData)
+		case protocol.MsgVerify:
+			// Client's verify token — confirm key agreement (password match)
+			decoded, err := base64.StdEncoding.DecodeString(msg.Data)
+			if err != nil {
+				continue
+			}
+			h.cryptoMu.RLock()
+			sess, ok := h.cryptoSessions[msg.ClientID]
+			h.cryptoMu.RUnlock()
+			if !ok {
+				continue
+			}
+			if err := sess.CheckVerify(decoded); err != nil {
+				// Password mismatch — remove this client's crypto session
+				h.cryptoMu.Lock()
+				delete(h.cryptoSessions, msg.ClientID)
+				h.cryptoMu.Unlock()
+				if h.localOut != nil {
+					banner := ui.Red("[keytun] client rejected — wrong session password")
+					h.localOutMu.Lock()
+					io.WriteString(h.localOut, fmt.Sprintf("\r\n%s\r\n", banner))
+					h.localOutMu.Unlock()
+				}
+				continue
+			}
+
 			select {
 			case <-h.keyReady:
 				// already closed from a previous key exchange
@@ -545,6 +594,14 @@ func (h *Host) readRelayMessages() {
 				h.localOutMu.Lock()
 				io.WriteString(h.localOut, fmt.Sprintf("\r\n%s\r\n", encBanner))
 				h.localOutMu.Unlock()
+			}
+
+			// Send current terminal dimensions to this client now that verification passed
+			h.termMu.Lock()
+			cols, rows := h.termCols, h.termRows
+			h.termMu.Unlock()
+			if cols > 0 && rows > 0 {
+				h.sendResizeTo(msg.ClientID, cols, rows)
 			}
 
 			// In system mode, send a banner to this specific client so they know
@@ -574,14 +631,6 @@ func (h *Host) readRelayMessages() {
 				}
 				kxData, _ := json.Marshal(kxMsg)
 				h.writeMessage(websocket.TextMessage, kxData)
-
-				// Send current terminal dimensions to this client
-				h.termMu.Lock()
-				cols, rows := h.termCols, h.termRows
-				h.termMu.Unlock()
-				if cols > 0 && rows > 0 {
-					h.sendResizeTo(msg.ClientID, cols, rows)
-				}
 
 				h.setTerminalTitle(clientCountStatus(count))
 				h.totalJoins++

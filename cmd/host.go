@@ -21,6 +21,7 @@ import (
 var hostRelayURL string
 var hostMode string
 var hostTarget string
+var hostPassword string
 
 var hostCmd = &cobra.Command{
 	Use:   "host",
@@ -56,6 +57,10 @@ func printSessionBox(code string) {
 	}
 	if clipNote != "" {
 		visible[1] += len(" (copied to clipboard)")
+	}
+	if hostPassword != "" {
+		lines = append(lines, fmt.Sprintf("%s %s", ui.Dim("Password:"), ui.Yellow("set (clients must provide it to join)")))
+		visible = append(visible, len("Password: set (clients must provide it to join)"))
 	}
 	fmt.Println()
 	ui.Box(os.Stdout, lines, visible)
@@ -106,6 +111,9 @@ func runTerminalMode(code string) error {
 		return fmt.Errorf("failed to start host: %w", err)
 	}
 	defer h.Close()
+	if hostPassword != "" {
+		h.SetPassword(hostPassword)
+	}
 
 	// Show a spinner while waiting for the first client to join
 	spinner := ui.NewSpinner(os.Stdout, "Waiting for client... (share the link with your colleague)")
@@ -214,6 +222,9 @@ func runSystemMode(code string) error {
 		return fmt.Errorf("failed to start host: %w", err)
 	}
 	defer h.Close()
+	if hostPassword != "" {
+		h.SetPassword(hostPassword)
+	}
 
 	fmt.Printf("%s %s %s\n", ui.Bold("keytun"), ui.Dim(Version), ui.Dim("(system mode)"))
 	printSessionBox(code)
@@ -249,4 +260,5 @@ func init() {
 	hostCmd.Flags().StringVar(&hostRelayURL, "relay", "wss://relay.keytun.com/ws", "relay server WebSocket URL")
 	hostCmd.Flags().StringVar(&hostMode, "mode", "terminal", "injection mode: terminal (PTY) or system (OS-level)")
 	hostCmd.Flags().StringVar(&hostTarget, "target", "", "target app name for system mode (e.g. \"TextEdit\")")
+	hostCmd.Flags().StringVarP(&hostPassword, "password", "p", "", "require clients to provide this password to join")
 }

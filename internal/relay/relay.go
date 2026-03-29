@@ -260,7 +260,7 @@ func (r *Relay) handleHost(conn *websocket.Conn, code string) {
 			continue
 		}
 
-		if msg.Type == protocol.MsgOutput || msg.Type == protocol.MsgKeyExchange || msg.Type == protocol.MsgResize {
+		if msg.Type == protocol.MsgOutput || msg.Type == protocol.MsgKeyExchange || msg.Type == protocol.MsgResize || msg.Type == protocol.MsgVerify {
 			sess.clientMu.RLock()
 			if msg.ClientID != "" {
 				// Targeted: send to a specific client
@@ -355,8 +355,8 @@ func (r *Relay) handleClient(conn *websocket.Conn, code string, ip string) {
 			continue
 		}
 
-		// Forward input and key exchange messages to host, tagging with this client's ID
-		if msg.Type == protocol.MsgInput || msg.Type == protocol.MsgKeyExchange {
+		// Forward input, key exchange, and verify messages to host, tagging with this client's ID
+		if msg.Type == protocol.MsgInput || msg.Type == protocol.MsgKeyExchange || msg.Type == protocol.MsgVerify {
 			msg.ClientID = clientID
 			tagged, err := json.Marshal(msg)
 			if err != nil {

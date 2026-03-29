@@ -39,8 +39,9 @@ func (c *Client) SetOnOutput(fn func([]byte)) {
 }
 
 // New creates a new Client that connects to the relay and joins a session.
-// Returns an error if the session doesn't exist.
-func New(relayURL string, sessionCode string) (*Client, error) {
+// An optional password can be provided for password-protected sessions.
+// Returns an error if the session doesn't exist or the password is wrong.
+func New(relayURL string, sessionCode string, password ...string) (*Client, error) {
 	conn, _, err := websocket.DefaultDialer.Dial(relayURL, nil)
 	if err != nil {
 		return nil, err
@@ -117,9 +118,55 @@ func New(relayURL string, sessionCode string) (*Client, error) {
 		conn.Close()
 		return nil, fmt.Errorf("decode peer public key: %w", err)
 	}
-	if err := sess.Complete(peerPub); err != nil {
+	var pw string
+	if len(password) > 0 {
+		pw = password[0]
+	}
+	if err := sess.Complete(peerPub, pw); err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("key exchange: %w", err)
+	}
+
+	// Send our verify token so the host can confirm key agreement (password match)
+	verifyToken, err := sess.VerifyToken()
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("verify token: %w", err)
+	}
+	verifyMsg := protocol.Message{
+		Type: protocol.MsgVerify,
+		Data: base64.StdEncoding.EncodeToString(verifyToken),
+	}
+	verifyData, _ := json.Marshal(verifyMsg)
+	if err := conn.WriteMessage(websocket.TextMessage, verifyData); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("send verify: %w", err)
+	}
+
+	// Read the host's verify token and confirm key agreement
+	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	_, verifyPeek, err := conn.ReadMessage()
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("read verify: %w", err)
+	}
+	var verifyResp protocol.Message
+	if err := json.Unmarshal(verifyPeek, &verifyResp); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("invalid verify response")
+	}
+	if verifyResp.Type != protocol.MsgVerify {
+		conn.Close()
+		return nil, fmt.Errorf("expected verify, got %s", verifyResp.Type)
+	}
+	hostToken, err := base64.StdEncoding.DecodeString(verifyResp.Data)
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("decode verify token: %w", err)
+	}
+	if err := sess.CheckVerify(hostToken); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("wrong session password")
 	}
 
 	conn.SetReadDeadline(time.Now().Add(pongTimeout))

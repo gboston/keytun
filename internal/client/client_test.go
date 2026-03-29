@@ -122,8 +122,36 @@ func startHostKeyExchange(t *testing.T, conn *websocket.Conn) <-chan hostKeyExch
 			Data: pubEncoded,
 		})
 		conn.WriteMessage(websocket.TextMessage, respData)
-		conn.SetReadDeadline(time.Time{})
 
+		// Send our verify token so the client can confirm key agreement
+		verifyToken, err := sess.VerifyToken()
+		if err != nil {
+			ch <- hostKeyExchangeResult{err: err}
+			return
+		}
+		verifyData, _ := json.Marshal(protocol.Message{
+			Type: protocol.MsgVerify,
+			Data: base64.StdEncoding.EncodeToString(verifyToken),
+		})
+		conn.WriteMessage(websocket.TextMessage, verifyData)
+
+		// Read the client's verify token
+		_, data, err = conn.ReadMessage()
+		if err != nil {
+			ch <- hostKeyExchangeResult{err: err}
+			return
+		}
+		var verifyMsg protocol.Message
+		json.Unmarshal(data, &verifyMsg)
+		if verifyMsg.Type == protocol.MsgVerify {
+			clientToken, _ := base64.StdEncoding.DecodeString(verifyMsg.Data)
+			if err := sess.CheckVerify(clientToken); err != nil {
+				ch <- hostKeyExchangeResult{err: err}
+				return
+			}
+		}
+
+		conn.SetReadDeadline(time.Time{})
 		ch <- hostKeyExchangeResult{session: sess}
 	}()
 	return ch

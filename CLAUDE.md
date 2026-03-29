@@ -35,25 +35,27 @@ Client (stdin) ──WS──▶ Relay (broker) ──WS──▶ Host (PTY)
                        ◀──────────────────────  (output back to client)
 ```
 
-**Message flow:** Client reads stdin byte-by-byte → base64-encodes → sends `input` message → relay routes to host → host writes to PTY. PTY output flows back the same way as `output` messages.
+**Message flow:** Client reads stdin byte-by-byte → encrypts (AES-256-GCM) → base64-encodes → sends `input` message → relay routes to host → host decrypts → writes to PTY. PTY output flows back the same way as `output` messages. The relay only sees opaque ciphertext.
 
 ### Key packages
 
-- **`cmd/`** — Cobra CLI subcommands (`host`, `join`, `relay`). Each wires flags and delegates to the corresponding `internal/` package.
-- **`internal/host/`** — Spawns a PTY (`creack/pty`), sets terminal to raw mode, multiplexes local stdin with remote input from relay.
-- **`internal/client/`** — Connects to relay, reads stdin byte-by-byte, sends keystrokes as base64 JSON. Double-Escape disconnects.
-- **`internal/relay/`** — HTTP server that upgrades `/ws` to WebSocket. Maintains an in-memory session map pairing host↔client connections and routing messages between them.
-- **`internal/protocol/`** — JSON message envelope (`Message` struct with `type`, `session`, `data`, `event`, `message` fields). All I/O data is base64-encoded.
+- **`cmd/`** — Cobra CLI subcommands (`host`, `join`, `relay`, `version`). Each wires flags and delegates to the corresponding `internal/` package.
+- **`internal/host/`** — Spawns a PTY (or system-level injector on macOS), multiplexes local stdin with remote input from relay. Manages per-client crypto sessions.
+- **`internal/client/`** — Connects to relay, reads stdin byte-by-byte, encrypts and sends keystrokes. Double-Escape disconnects. Auto-reconnects with exponential backoff.
+- **`internal/relay/`** — HTTP server that upgrades `/ws` to WebSocket. Maintains an in-memory session map pairing host↔client connections and routing messages between them. Per-IP rate limiting on joins.
+- **`internal/protocol/`** — JSON message envelope (`Message` struct with `type`, `session`, `client_id`, `data`, `message`, `event`, `cols`, `rows` fields).
+- **`internal/crypto/`** — End-to-end encryption: X25519 key exchange, HKDF-SHA256 key derivation, AES-256-GCM authenticated encryption. The relay never sees plaintext.
+- **`internal/inject/`** — Keystroke injection backends: PTY mode (all platforms) and system mode (macOS only, via CoreGraphics). Defines the `Injector` interface.
 - **`internal/session/`** — Generates human-readable session codes in `adjective-noun-NN` format from embedded wordlists.
 - **`internal/integration/`** — End-to-end tests using an in-process relay (httptest) to verify keystroke flow, disconnect notifications, and control character preservation.
 
 ## Protocol
 
-Seven message types: `host_register`, `client_join`, `input`, `output`, `error`, `peer_event`, `session_joined`. See `internal/protocol/messages.go` for definitions.
+Ten message types: `host_register`, `host_registered`, `client_join`, `session_joined`, `key_exchange`, `input`, `output`, `resize`, `peer_event`, `error`. See `internal/protocol/messages.go` for definitions.
 
 ## Dependencies
 
-Go 1.25.0 with: `spf13/cobra` (CLI), `gorilla/websocket` (WebSocket), `creack/pty` (PTY), `golang.org/x/term` (raw mode).
+Go 1.25.0 with: `spf13/cobra` (CLI), `gorilla/websocket` (WebSocket), `creack/pty` (PTY), `golang.org/x/term` (raw mode), `golang.org/x/time` (rate limiting).
 
 ## Website
 

@@ -17,6 +17,7 @@ import (
 )
 
 var joinRelayURL string
+var joinPassword string
 
 var joinCmd = &cobra.Command{
 	Use:   "join [session-code]",
@@ -36,8 +37,11 @@ var joinCmd = &cobra.Command{
 		firstConnect := true
 
 		for {
-			c, err := client.New(joinRelayURL, sessionCode)
+			c, err := client.New(joinRelayURL, sessionCode, joinPassword)
 			if err != nil {
+				if isPasswordError(err) {
+					return fmt.Errorf("wrong session password")
+				}
 				if isSessionGone(err) {
 					if firstConnect {
 						return fmt.Errorf("failed to join session: %w", err)
@@ -177,6 +181,11 @@ func isSessionGone(err error) bool {
 	return strings.Contains(msg, "session not found") || strings.Contains(msg, "no such session")
 }
 
+// isPasswordError returns true if the error indicates a wrong session password.
+func isPasswordError(err error) bool {
+	return strings.Contains(err.Error(), "wrong session password")
+}
+
 // backoffDelay calculates an exponential backoff delay with jitter.
 func backoffDelay(attempt int, initial, max time.Duration, mult, jitterFrac float64) time.Duration {
 	delay := float64(initial) * math.Pow(mult, float64(attempt-1))
@@ -191,4 +200,5 @@ func backoffDelay(attempt int, initial, max time.Duration, mult, jitterFrac floa
 
 func init() {
 	joinCmd.Flags().StringVar(&joinRelayURL, "relay", "wss://relay.keytun.com/ws", "relay server WebSocket URL")
+	joinCmd.Flags().StringVarP(&joinPassword, "password", "p", "", "session password (if the host set one)")
 }

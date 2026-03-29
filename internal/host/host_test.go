@@ -107,7 +107,8 @@ func simulateClientJoinWithKeyExchange(t *testing.T, conn *websocket.Conn, sessi
 }
 
 // simulateClientJoinFull joins a session and returns both the crypto session and the client ID.
-func simulateClientJoinFull(t *testing.T, conn *websocket.Conn, session string) clientSession {
+// An optional password can be provided for password-protected sessions.
+func simulateClientJoinFull(t *testing.T, conn *websocket.Conn, session string, password ...string) clientSession {
 	t.Helper()
 	// Send client_join
 	sendMsg(t, conn, protocol.Message{
@@ -137,9 +138,37 @@ func simulateClientJoinFull(t *testing.T, conn *websocket.Conn, session string) 
 	if err != nil {
 		t.Fatalf("decode peer pub: %v", err)
 	}
-	if err := sess.Complete(peerPub); err != nil {
+	var pw string
+	if len(password) > 0 {
+		pw = password[0]
+	}
+	if err := sess.Complete(peerPub, pw); err != nil {
 		t.Fatalf("complete key exchange: %v", err)
 	}
+
+	// Read host's verify token
+	verifyMsg := readMsg(t, conn)
+	if verifyMsg.Type != protocol.MsgVerify {
+		t.Fatalf("expected verify, got %+v", verifyMsg)
+	}
+	hostToken, err := base64.StdEncoding.DecodeString(verifyMsg.Data)
+	if err != nil {
+		t.Fatalf("decode verify token: %v", err)
+	}
+	if err := sess.CheckVerify(hostToken); err != nil {
+		t.Fatalf("host verify failed: %v", err)
+	}
+
+	// Send our verify token back to the host
+	clientToken, err := sess.VerifyToken()
+	if err != nil {
+		t.Fatalf("client verify token: %v", err)
+	}
+	sendMsg(t, conn, protocol.Message{
+		Type: protocol.MsgVerify,
+		Data: base64.StdEncoding.EncodeToString(clientToken),
+	})
+
 	return clientSession{crypto: sess, clientID: kxMsg.ClientID}
 }
 

@@ -15,6 +15,7 @@ const (
 	MsgPeerEvent      MessageType = "peer_event"
 	MsgSessionJoined  MessageType = "session_joined"
 	MsgKeyExchange    MessageType = "key_exchange"
+	MsgVerify         MessageType = "verify"
 	MsgResize         MessageType = "resize"
 )
 

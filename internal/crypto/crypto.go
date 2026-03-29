@@ -10,6 +10,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"io"
 )
 
@@ -35,8 +36,10 @@ func (s *Session) PublicKey() []byte {
 }
 
 // Complete performs ECDH with the peer's public key and derives the
-// AES-256-GCM symmetric key via HKDF-SHA256.
-func (s *Session) Complete(peerPubBytes []byte) error {
+// AES-256-GCM symmetric key via HKDF-SHA256. An optional password can be
+// provided to mix into the HKDF salt — both sides must use the same password
+// for decryption to succeed. An empty string is equivalent to no password.
+func (s *Session) Complete(peerPubBytes []byte, password ...string) error {
 	peerPub, err := ecdh.X25519().NewPublicKey(peerPubBytes)
 	if err != nil {
 		return err
@@ -46,8 +49,16 @@ func (s *Session) Complete(peerPubBytes []byte) error {
 		return err
 	}
 
+	// When a password is provided, mix it into the HKDF salt so that both
+	// sides must agree on the password to derive the same AES key. An empty
+	// password produces a nil salt, preserving backward compatibility.
+	var salt []byte
+	if len(password) > 0 && password[0] != "" {
+		salt = []byte("keytun-password:" + password[0])
+	}
+
 	// Derive a 32-byte AES-256 key from the shared secret.
-	aesKey, err := hkdf.Key(sha256.New, shared, nil, "keytun-e2e-v1", 32)
+	aesKey, err := hkdf.Key(sha256.New, shared, salt, "keytun-e2e-v1", 32)
 	if err != nil {
 		return err
 	}
@@ -78,6 +89,28 @@ func (s *Session) Encrypt(plaintext []byte) ([]byte, error) {
 		return nil, err
 	}
 	return s.aead.Seal(nonce, nonce, plaintext, nil), nil
+}
+
+// verifyChallenge is the known plaintext used to confirm both sides
+// derived the same key (i.e. passwords match).
+var verifyChallenge = []byte("keytun-verify-v1")
+
+// VerifyToken encrypts the known challenge so the peer can confirm key agreement.
+func (s *Session) VerifyToken() ([]byte, error) {
+	return s.Encrypt(verifyChallenge)
+}
+
+// CheckVerify decrypts a verify token and checks it matches the expected challenge.
+// Returns an error if the token is invalid (e.g. password mismatch).
+func (s *Session) CheckVerify(token []byte) error {
+	plaintext, err := s.Decrypt(token)
+	if err != nil {
+		return fmt.Errorf("password mismatch or invalid verify token")
+	}
+	if string(plaintext) != string(verifyChallenge) {
+		return fmt.Errorf("verify challenge mismatch")
+	}
+	return nil
 }
 
 // Decrypt decrypts ciphertext produced by Encrypt. Expects nonce || ciphertext.

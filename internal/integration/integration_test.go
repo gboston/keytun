@@ -275,6 +275,82 @@ func TestEndToEnd_ClientDisconnectDoesNotAffectOtherClients(t *testing.T) {
 	}
 }
 
+func TestEndToEnd_PasswordProtectedSession(t *testing.T) {
+	server, r := startRelay(t)
+	url := wsURL(server)
+
+	inj := newPTYInjector(t)
+	h, err := host.New(url, "e2e-pw-01", inj)
+	if err != nil {
+		t.Fatalf("host.New: %v", err)
+	}
+	defer h.Close()
+	h.SetPassword("secret123")
+	waitForSession(t, r, "e2e-pw-01", 2*time.Second)
+
+	// Client with correct password should connect and send input
+	c, err := client.New(url, "e2e-pw-01", "secret123")
+	if err != nil {
+		t.Fatalf("client.New with correct password: %v", err)
+	}
+	defer c.Close()
+
+	if err := c.SendInput([]byte("echo pw-works\n")); err != nil {
+		t.Fatalf("SendInput: %v", err)
+	}
+
+	output := h.ReadOutputUntil("pw-works", 5*time.Second)
+	if !strings.Contains(output, "pw-works") {
+		t.Errorf("expected 'pw-works' in output, got: %q", output)
+	}
+}
+
+func TestEndToEnd_WrongPasswordRejected(t *testing.T) {
+	server, r := startRelay(t)
+	url := wsURL(server)
+
+	inj := newPTYInjector(t)
+	h, err := host.New(url, "e2e-pw-02", inj)
+	if err != nil {
+		t.Fatalf("host.New: %v", err)
+	}
+	defer h.Close()
+	h.SetPassword("correct-password")
+	waitForSession(t, r, "e2e-pw-02", 2*time.Second)
+
+	// Client with wrong password should fail
+	_, err = client.New(url, "e2e-pw-02", "wrong-password")
+	if err == nil {
+		t.Fatal("expected error when joining with wrong password")
+	}
+	if !strings.Contains(err.Error(), "wrong session password") {
+		t.Errorf("expected 'wrong session password' error, got: %v", err)
+	}
+}
+
+func TestEndToEnd_NoPasswordWhenHostRequiresOne(t *testing.T) {
+	server, r := startRelay(t)
+	url := wsURL(server)
+
+	inj := newPTYInjector(t)
+	h, err := host.New(url, "e2e-pw-03", inj)
+	if err != nil {
+		t.Fatalf("host.New: %v", err)
+	}
+	defer h.Close()
+	h.SetPassword("required-password")
+	waitForSession(t, r, "e2e-pw-03", 2*time.Second)
+
+	// Client without password should fail
+	_, err = client.New(url, "e2e-pw-03")
+	if err == nil {
+		t.Fatal("expected error when joining without password")
+	}
+	if !strings.Contains(err.Error(), "wrong session password") {
+		t.Errorf("expected 'wrong session password' error, got: %v", err)
+	}
+}
+
 func TestEndToEnd_HostOutputReachesClient(t *testing.T) {
 	server, r := startRelay(t)
 	url := wsURL(server)

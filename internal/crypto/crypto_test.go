@@ -190,6 +190,126 @@ func TestDecryptCiphertextTooShort(t *testing.T) {
 	}
 }
 
+func TestPasswordMatchingDeriveSameKey(t *testing.T) {
+	a, err := NewSession()
+	if err != nil {
+		t.Fatalf("NewSession a: %v", err)
+	}
+	b, err := NewSession()
+	if err != nil {
+		t.Fatalf("NewSession b: %v", err)
+	}
+
+	password := "hunter2"
+	if err := a.Complete(b.PublicKey(), password); err != nil {
+		t.Fatalf("a.Complete: %v", err)
+	}
+	if err := b.Complete(a.PublicKey(), password); err != nil {
+		t.Fatalf("b.Complete: %v", err)
+	}
+
+	plaintext := []byte("password-protected data")
+	ct, err := a.Encrypt(plaintext)
+	if err != nil {
+		t.Fatalf("Encrypt: %v", err)
+	}
+	pt, err := b.Decrypt(ct)
+	if err != nil {
+		t.Fatalf("Decrypt: %v", err)
+	}
+	if !bytes.Equal(plaintext, pt) {
+		t.Fatalf("round-trip mismatch")
+	}
+}
+
+func TestPasswordMismatchFailsDecryption(t *testing.T) {
+	a, err := NewSession()
+	if err != nil {
+		t.Fatalf("NewSession a: %v", err)
+	}
+	b, err := NewSession()
+	if err != nil {
+		t.Fatalf("NewSession b: %v", err)
+	}
+
+	if err := a.Complete(b.PublicKey(), "correct-password"); err != nil {
+		t.Fatalf("a.Complete: %v", err)
+	}
+	if err := b.Complete(a.PublicKey(), "wrong-password"); err != nil {
+		t.Fatalf("b.Complete: %v", err)
+	}
+
+	ct, err := a.Encrypt([]byte("secret"))
+	if err != nil {
+		t.Fatalf("Encrypt: %v", err)
+	}
+	_, err = b.Decrypt(ct)
+	if err == nil {
+		t.Fatal("expected decryption to fail with mismatched passwords")
+	}
+}
+
+func TestEmptyPasswordBackwardCompatible(t *testing.T) {
+	// Empty password should produce the same key as no password,
+	// ensuring backward compatibility with sessions that don't use passwords.
+	a, err := NewSession()
+	if err != nil {
+		t.Fatalf("NewSession a: %v", err)
+	}
+	b, err := NewSession()
+	if err != nil {
+		t.Fatalf("NewSession b: %v", err)
+	}
+
+	// a uses empty string, b uses empty string
+	if err := a.Complete(b.PublicKey(), ""); err != nil {
+		t.Fatalf("a.Complete: %v", err)
+	}
+	if err := b.Complete(a.PublicKey()); err != nil {
+		t.Fatalf("b.Complete: %v", err)
+	}
+
+	plaintext := []byte("backward compat")
+	ct, err := a.Encrypt(plaintext)
+	if err != nil {
+		t.Fatalf("Encrypt: %v", err)
+	}
+	pt, err := b.Decrypt(ct)
+	if err != nil {
+		t.Fatalf("Decrypt: %v", err)
+	}
+	if !bytes.Equal(plaintext, pt) {
+		t.Fatalf("round-trip mismatch")
+	}
+}
+
+func TestPasswordVsNoPasswordFails(t *testing.T) {
+	a, err := NewSession()
+	if err != nil {
+		t.Fatalf("NewSession a: %v", err)
+	}
+	b, err := NewSession()
+	if err != nil {
+		t.Fatalf("NewSession b: %v", err)
+	}
+
+	if err := a.Complete(b.PublicKey(), "some-password"); err != nil {
+		t.Fatalf("a.Complete: %v", err)
+	}
+	if err := b.Complete(a.PublicKey()); err != nil {
+		t.Fatalf("b.Complete: %v", err)
+	}
+
+	ct, err := a.Encrypt([]byte("secret"))
+	if err != nil {
+		t.Fatalf("Encrypt: %v", err)
+	}
+	_, err = b.Decrypt(ct)
+	if err == nil {
+		t.Fatal("expected decryption to fail when one side has a password and the other doesn't")
+	}
+}
+
 // completedPair creates two sessions that have completed key exchange.
 func completedPair(t *testing.T) (*Session, *Session) {
 	t.Helper()
