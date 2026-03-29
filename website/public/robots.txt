@@ -1,0 +1,8 @@
+# ABOUTME: Crawl directives for search engine bots.
+# ABOUTME: Allows indexing of all public pages, blocks session pages.
+
+User-agent: *
+Allow: /
+Disallow: /s/
+
+Sitemap: https://keytun.com/sitemap-index.xml

@@ -13,6 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@astrojs/sitemap": "^3.7.2",
     "astro": "^6.1.0",
     "ghostty-web": "^0.4.0"
   },

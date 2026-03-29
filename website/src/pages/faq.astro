@@ -7,6 +7,79 @@ import Footer from '../components/Footer.astro';
 ---
 
 <Layout title="FAQ — keytun" description="Frequently asked questions about keytun — security, usage, and technical details.">
+	<Fragment slot="head">
+		<script type="application/ld+json" set:html={JSON.stringify({
+			"@context": "https://schema.org",
+			"@type": "FAQPage",
+			"mainEntity": [
+				{
+					"@type": "Question",
+					"name": "Is keytun safe? Can the relay see my keystrokes?",
+					"acceptedAnswer": { "@type": "Answer", "text": "Keytun uses end-to-end encryption (X25519 key exchange + AES-256-GCM). The relay server is a dumb pipe — it only ever sees ciphertext. Even if you use the public relay at relay.keytun.com, your keystrokes and terminal output are never visible to the relay operator." }
+				},
+				{
+					"@type": "Question",
+					"name": "Can I self-host the relay?",
+					"acceptedAnswer": { "@type": "Answer", "text": "Yes. The relay is a stateless WebSocket broker with no database or persistence. Run 'keytun relay --port 8080' on any server, or deploy the Docker image to Fly.io, Railway, or any container host. Then pass '--relay ws://your-server:8080/ws' when hosting or joining." }
+				},
+				{
+					"@type": "Question",
+					"name": "Who can join my session?",
+					"acceptedAnswer": { "@type": "Answer", "text": "Anyone with your session code. Session codes are randomly generated from a wordlist (e.g. keen-fox-42) and are unguessable. Sessions are ephemeral — they exist only in memory while the host is connected. Once the host disconnects, the session is gone." }
+				},
+				{
+					"@type": "Question",
+					"name": "Does my colleague need to install keytun?",
+					"acceptedAnswer": { "@type": "Answer", "text": "No. They can join straight from the browser — no install needed. You can also share a direct link like keytun.com/s/keen-fox-42. If they prefer a native experience, they can install keytun and use 'keytun join <code>'." }
+				},
+				{
+					"@type": "Question",
+					"name": "Do arrow keys, tab completion, and Ctrl+C work?",
+					"acceptedAnswer": { "@type": "Answer", "text": "Yes. In terminal mode, keytun spawns a real PTY (pseudo-terminal). Raw key bytes are sent — arrow keys, tab completion, Ctrl+C, Ctrl+D, and other control sequences all work exactly as they would locally." }
+				},
+				{
+					"@type": "Question",
+					"name": "How do I disconnect?",
+					"acceptedAnswer": { "@type": "Answer", "text": "As a client: Press Esc twice in quick succession. As a host: Type 'exit' in the terminal (or Ctrl+D) to close the shell — this ends the session." }
+				},
+				{
+					"@type": "Question",
+					"name": "What's the difference between terminal mode and system mode?",
+					"acceptedAnswer": { "@type": "Answer", "text": "Terminal mode (default) spawns a PTY — your colleague types into a real shell session. System mode injects keystrokes at the OS level into any application. Use 'keytun host --mode system' to target the focused window, or '--target \"VS Code\"' to target a specific app. Currently macOS only." }
+				},
+				{
+					"@type": "Question",
+					"name": "Why does keytun need a relay server?",
+					"acceptedAnswer": { "@type": "Answer", "text": "Most people are behind NATs, firewalls, or corporate networks that prevent direct peer-to-peer connections. The relay solves this by giving both sides a public WebSocket endpoint to connect to — no port forwarding, no VPN, no firewall rules." }
+				},
+				{
+					"@type": "Question",
+					"name": "What platforms does keytun support?",
+					"acceptedAnswer": { "@type": "Answer", "text": "keytun runs on macOS, Linux, and Windows. Terminal mode works on all three. System mode (OS-level keystroke injection) is currently macOS only, with Linux support planned." }
+				},
+				{
+					"@type": "Question",
+					"name": "Can multiple clients join the same session?",
+					"acceptedAnswer": { "@type": "Answer", "text": "Yes. Keytun supports fan-out — multiple clients can join the same session simultaneously. All connected clients can send keystrokes to the host's PTY, and all receive the terminal output." }
+				},
+				{
+					"@type": "Question",
+					"name": "What happens if the connection drops?",
+					"acceptedAnswer": { "@type": "Answer", "text": "Both sides are notified immediately via a peer disconnect event. The host's shell session is unaffected — it keeps running. The client can rejoin using the same session code as long as the host is still connected." }
+				},
+				{
+					"@type": "Question",
+					"name": "How is keytun different from tmux/tmate or VS Code Live Share?",
+					"acceptedAnswer": { "@type": "Answer", "text": "Those tools are great for full pair programming sessions. Keytun solves a narrower problem: you're already screensharing and your colleague just needs to type one command. No shared editor setup, no tmux session, no account creation — just a session code and they're typing." }
+				},
+				{
+					"@type": "Question",
+					"name": "Is keytun open source?",
+					"acceptedAnswer": { "@type": "Answer", "text": "Yes. Keytun is licensed under AGPL v3 and the source is on GitHub. Contributions are welcome." }
+				}
+			]
+		})} />
+	</Fragment>
 	<Nav />
 	<main id="main-content" class="faq-page">
 		<div class="container">
@@ -101,7 +174,7 @@ import Footer from '../components/Footer.astro';
 				<details class="faq-item">
 					<summary>Can multiple clients join the same session?</summary>
 					<div class="faq-answer">
-						<p>Currently, each session supports one host and one client. Multi-client sessions are not yet supported but may be added in the future.</p>
+						<p>Yes. Keytun supports fan-out — multiple clients can join the same session simultaneously. All connected clients can send keystrokes to the host's PTY, and all receive the terminal output.</p>
 					</div>
 				</details>
 
@@ -163,9 +236,7 @@ import Footer from '../components/Footer.astro';
 		font-weight: 700;
 		letter-spacing: -0.02em;
 		color: var(--text);
-		margin-bottom: 16px;
-		padding-bottom: 12px;
-		border-bottom: 1px solid var(--border);
+		margin-bottom: 0;
 	}
 
 	.faq-category-icon {
@@ -173,8 +244,8 @@ import Footer from '../components/Footer.astro';
 	}
 
 	/* Individual FAQ item */
-	.faq-item {
-		border-bottom: 1px solid var(--border);
+	.faq-item + .faq-item {
+		border-top: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
 	}
 
 	.faq-item summary {

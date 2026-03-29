@@ -16,6 +16,23 @@ import Footer from '../components/Footer.astro';
 ---
 
 <Layout title="keytun - Let remote colleagues type into your terminal" description="Lightweight keyboard tunnel for pair programming over screenshare. Share a session code, and your colleague types into your terminal in real time.">
+	<Fragment slot="head">
+		<script type="application/ld+json" set:html={JSON.stringify({
+			"@context": "https://schema.org",
+			"@type": "SoftwareApplication",
+			"name": "keytun",
+			"description": "Lightweight keyboard tunnel for pair programming over screenshare. Share a session code, and your colleague types into your terminal in real time.",
+			"applicationCategory": "DeveloperApplication",
+			"operatingSystem": "macOS, Linux, Windows",
+			"license": "https://www.gnu.org/licenses/agpl-3.0.html",
+			"url": "https://keytun.com",
+			"offers": {
+				"@type": "Offer",
+				"price": "0",
+				"priceCurrency": "USD"
+			}
+		})} />
+	</Fragment>
 	<Nav />
 	<main id="main-content">
 		<Hero />

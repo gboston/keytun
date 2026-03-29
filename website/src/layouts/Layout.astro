@@ -5,9 +5,10 @@
 interface Props {
 	title: string;
 	description?: string;
+	noindex?: boolean;
 }
 
-const { title, description = "Lightweight keyboard tunnel for pair programming over screenshare. Share a session code, and your colleague types into your terminal in real time." } = Astro.props;
+const { title, description = "Lightweight keyboard tunnel for pair programming over screenshare. Share a session code, and your colleague types into your terminal in real time.", noindex = false } = Astro.props;
 ---
 
 <html lang="en">
@@ -16,12 +17,16 @@ const { title, description = "Lightweight keyboard tunnel for pair programming o
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<meta name="description" content={description} />
+		{noindex && <meta name="robots" content="noindex, nofollow" />}
+		<meta name="theme-color" content="#0c0c10" media="(prefers-color-scheme: dark)" />
+		<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
 		<title>{title}</title>
 
 		<link rel="canonical" href={new URL(Astro.url.pathname, Astro.site).href} />
 
 		<!-- Open Graph -->
 		<meta property="og:type" content="website" />
+		<meta property="og:locale" content="en_US" />
 		<meta property="og:url" content={new URL(Astro.url.pathname, Astro.site).href} />
 		<meta property="og:title" content={title} />
 		<meta property="og:description" content={description} />
@@ -35,6 +40,8 @@ const { title, description = "Lightweight keyboard tunnel for pair programming o
 		<meta name="twitter:title" content={title} />
 		<meta name="twitter:description" content={description} />
 		<meta name="twitter:image" content="https://keytun.com/og-image.png" />
+
+		<slot name="head" />
 
 		<!-- PostHog analytics -->
 		<script>
@@ -165,8 +172,8 @@ const { title, description = "Lightweight keyboard tunnel for pair programming o
 		--font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
 		--font-display: 'Space Grotesk', var(--font-sans);
 		--bg-texture:
-			repeating-linear-gradient(0deg, transparent 0, transparent 47px, rgba(0,0,0,0.05) 47px, rgba(0,0,0,0.05) 48px),
-			repeating-linear-gradient(90deg, transparent 0, transparent 47px, rgba(0,0,0,0.05) 47px, rgba(0,0,0,0.05) 48px);
+			repeating-linear-gradient(0deg, transparent 0, transparent 47px, rgba(0,0,0,0.02) 47px, rgba(0,0,0,0.02) 48px),
+			repeating-linear-gradient(90deg, transparent 0, transparent 47px, rgba(0,0,0,0.02) 47px, rgba(0,0,0,0.02) 48px);
 
 		/* Light theme (default) */
 		--bg: #ffffff;
