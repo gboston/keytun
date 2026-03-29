@@ -14,8 +14,10 @@
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.2",
-    "astro": "^6.1.0",
-    "ghostty-web": "^0.4.0"
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-webgl": "^0.19.0",
+    "@xterm/xterm": "^6.0.0",
+    "astro": "^6.1.0"
   },
   "devDependencies": {
     "vitest": "^3.0.0"

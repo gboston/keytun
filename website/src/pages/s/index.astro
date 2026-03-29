@@ -53,7 +53,10 @@ import Nav from '../../components/Nav.astro';
 	</main>
 
 	<script>
-		import { init, Terminal } from 'ghostty-web';
+		import { Terminal } from '@xterm/xterm';
+		import { WebglAddon } from '@xterm/addon-webgl';
+		import { FitAddon } from '@xterm/addon-fit';
+		import '@xterm/xterm/css/xterm.css';
 		import { KeytunClient, EscapeDetector } from '../../scripts/keytun-client.js';
 
 		const RELAY_URL = 'wss://relay.keytun.com/ws';
@@ -112,16 +115,14 @@ import Nav from '../../components/Nav.astro';
 				return;
 			}
 
-			// Initialize ghostty-web WASM module
-			await init();
-
 			terminalTitle.textContent = `keytun — ${sessionCode}`;
 
-			// Set up ghostty-web terminal
+			// Set up xterm.js terminal
 			const term = new Terminal({
 				cursorBlink: true,
 				fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace",
 				fontSize: 14,
+				allowProposedApi: true,
 				theme: {
 					background: getComputedStyle(document.documentElement).getPropertyValue('--terminal-bg').trim() || '#141925',
 					foreground: '#c9d1d9',
@@ -129,6 +130,8 @@ import Nav from '../../components/Nav.astro';
 					selectionBackground: 'rgba(139, 108, 224, 0.3)',
 				},
 			});
+			const fitAddon = new FitAddon();
+			term.loadAddon(fitAddon);
 
 			// Connect to relay
 			showStatus(`Connecting to session ${sessionCode}...`);
@@ -182,6 +185,12 @@ import Nav from '../../components/Nav.astro';
 			showTerminal();
 			sessionStatusText.textContent = `End-to-end encrypted \u00b7 Session ${sessionCode}`;
 			term.open(terminalContainer);
+			try {
+				term.loadAddon(new WebglAddon());
+			} catch {
+				// WebGL not available, fall back to canvas renderer
+			}
+			fitAddon.fit();
 			term.focus();
 
 			// Wire output: relay -> terminal
@@ -195,8 +204,12 @@ import Nav from '../../components/Nav.astro';
 			};
 
 			// Wire input: terminal -> relay (with escape detection)
+			// Bytes from a single onData call are buffered and sent as one
+			// message so multi-byte escape sequences (e.g. arrow keys: \x1b[A)
+			// arrive atomically at the host PTY.
 			term.onData((data: string) => {
 				const bytes = new TextEncoder().encode(data);
+				const buf: number[] = [];
 
 				for (let i = 0; i < bytes.length; i++) {
 					const result = escapeDetector.feed(bytes[i]);
@@ -206,16 +219,20 @@ import Nav from '../../components/Nav.astro';
 							client.disconnect();
 							return;
 						case 'held':
-							// Don't send yet, wait for next byte
+							// Don't add yet, wait for next byte
 							break;
 						case 'flush':
-							// Send the pending escape + current byte
-							client.sendInput(new Uint8Array([0x1b, bytes[i]]));
+							// Add the pending escape + current byte
+							buf.push(0x1b, bytes[i]);
 							break;
 						case 'pass':
-							client.sendInput(new Uint8Array([bytes[i]]));
+							buf.push(bytes[i]);
 							break;
 					}
+				}
+
+				if (buf.length > 0) {
+					client.sendInput(new Uint8Array(buf));
 				}
 			});
 		}

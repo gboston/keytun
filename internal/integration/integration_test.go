@@ -15,14 +15,28 @@ import (
 	"github.com/gboston/keytun/internal/relay"
 )
 
-func startRelay(t *testing.T) *httptest.Server {
+func startRelay(t *testing.T) (*httptest.Server, *relay.Relay) {
 	t.Helper()
 	r := relay.New()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", r.HandleWebSocket)
 	server := httptest.NewServer(mux)
 	t.Cleanup(func() { server.Close() })
-	return server
+	return server, r
+}
+
+// waitForSession polls until the relay has registered the session.
+// Prevents races between host.New() returning and client.New() joining.
+func waitForSession(t *testing.T, r *relay.Relay, code string, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if r.HasSession(code) {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for session %q to be registered", code)
 }
 
 func wsURL(server *httptest.Server) string {
@@ -40,7 +54,7 @@ func newPTYInjector(t *testing.T) *inject.PTYInjector {
 }
 
 func TestEndToEnd_KeystrokesFlowThrough(t *testing.T) {
-	server := startRelay(t)
+	server, r := startRelay(t)
 	url := wsURL(server)
 
 	// Start host
@@ -50,6 +64,7 @@ func TestEndToEnd_KeystrokesFlowThrough(t *testing.T) {
 		t.Fatalf("host.New: %v", err)
 	}
 	defer h.Close()
+	waitForSession(t, r, "e2e-fox-42", 2*time.Second)
 
 	// Start client
 	c, err := client.New(url, "e2e-fox-42")
@@ -71,7 +86,7 @@ func TestEndToEnd_KeystrokesFlowThrough(t *testing.T) {
 }
 
 func TestEndToEnd_ClientDisconnectNotifiesHost(t *testing.T) {
-	server := startRelay(t)
+	server, r := startRelay(t)
 	url := wsURL(server)
 
 	inj := newPTYInjector(t)
@@ -80,6 +95,7 @@ func TestEndToEnd_ClientDisconnectNotifiesHost(t *testing.T) {
 		t.Fatalf("host.New: %v", err)
 	}
 	defer h.Close()
+	waitForSession(t, r, "e2e-fox-43", 2*time.Second)
 
 	c, err := client.New(url, "e2e-fox-43")
 	if err != nil {
@@ -103,7 +119,7 @@ func TestEndToEnd_ClientDisconnectNotifiesHost(t *testing.T) {
 }
 
 func TestEndToEnd_ControlSequencesPreserved(t *testing.T) {
-	server := startRelay(t)
+	server, r := startRelay(t)
 	url := wsURL(server)
 
 	inj := newPTYInjector(t)
@@ -112,6 +128,7 @@ func TestEndToEnd_ControlSequencesPreserved(t *testing.T) {
 		t.Fatalf("host.New: %v", err)
 	}
 	defer h.Close()
+	waitForSession(t, r, "e2e-fox-44", 2*time.Second)
 
 	c, err := client.New(url, "e2e-fox-44")
 	if err != nil {
@@ -132,7 +149,7 @@ func TestEndToEnd_ControlSequencesPreserved(t *testing.T) {
 }
 
 func TestEndToEnd_MultipleInputMessages(t *testing.T) {
-	server := startRelay(t)
+	server, r := startRelay(t)
 	url := wsURL(server)
 
 	inj := newPTYInjector(t)
@@ -141,6 +158,7 @@ func TestEndToEnd_MultipleInputMessages(t *testing.T) {
 		t.Fatalf("host.New: %v", err)
 	}
 	defer h.Close()
+	waitForSession(t, r, "e2e-fox-45", 2*time.Second)
 
 	c, err := client.New(url, "e2e-fox-45")
 	if err != nil {
@@ -162,7 +180,7 @@ func TestEndToEnd_MultipleInputMessages(t *testing.T) {
 }
 
 func TestEndToEnd_TwoClientsCanTypeSimultaneously(t *testing.T) {
-	server := startRelay(t)
+	server, r := startRelay(t)
 	url := wsURL(server)
 
 	inj := newPTYInjector(t)
@@ -171,6 +189,7 @@ func TestEndToEnd_TwoClientsCanTypeSimultaneously(t *testing.T) {
 		t.Fatalf("host.New: %v", err)
 	}
 	defer h.Close()
+	waitForSession(t, r, "e2e-fox-50", 2*time.Second)
 
 	// Connect two clients to the same session
 	c1, err := client.New(url, "e2e-fox-50")
@@ -205,7 +224,7 @@ func TestEndToEnd_TwoClientsCanTypeSimultaneously(t *testing.T) {
 }
 
 func TestEndToEnd_ClientDisconnectDoesNotAffectOtherClients(t *testing.T) {
-	server := startRelay(t)
+	server, r := startRelay(t)
 	url := wsURL(server)
 
 	inj := newPTYInjector(t)
@@ -214,6 +233,7 @@ func TestEndToEnd_ClientDisconnectDoesNotAffectOtherClients(t *testing.T) {
 		t.Fatalf("host.New: %v", err)
 	}
 	defer h.Close()
+	waitForSession(t, r, "e2e-fox-51", 2*time.Second)
 
 	// Connect two clients
 	c1, err := client.New(url, "e2e-fox-51")
@@ -256,7 +276,7 @@ func TestEndToEnd_ClientDisconnectDoesNotAffectOtherClients(t *testing.T) {
 }
 
 func TestEndToEnd_HostOutputReachesClient(t *testing.T) {
-	server := startRelay(t)
+	server, r := startRelay(t)
 	url := wsURL(server)
 
 	inj := newPTYInjector(t)
@@ -265,6 +285,7 @@ func TestEndToEnd_HostOutputReachesClient(t *testing.T) {
 		t.Fatalf("host.New: %v", err)
 	}
 	defer h.Close()
+	waitForSession(t, r, "e2e-fox-46", 2*time.Second)
 
 	// Use a real client so encryption handshake is handled automatically
 	c, err := client.New(url, "e2e-fox-46")

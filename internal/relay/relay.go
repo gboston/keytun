@@ -313,14 +313,13 @@ func (r *Relay) handleClient(conn *websocket.Conn, code string, ip string) {
 	sess.clients[clientID] = conn
 	sess.clientMu.Unlock()
 
-	// Notify host that client joined (with ClientID)
-	if err := sess.sendToHost(protocol.Message{
+	// Notify host that client joined (with ClientID).
+	// Best-effort: may fail if the host disconnects concurrently.
+	sess.sendToHost(protocol.Message{
 		Type:     protocol.MsgPeerEvent,
 		Event:    "joined",
 		ClientID: clientID,
-	}); err != nil {
-		log.Printf("notify host of client join: %v", err)
-	}
+	})
 
 	defer func() {
 		close(done)
@@ -328,14 +327,13 @@ func (r *Relay) handleClient(conn *websocket.Conn, code string, ip string) {
 		sess.clientMu.Lock()
 		delete(sess.clients, clientID)
 		sess.clientMu.Unlock()
-		// Notify host that client left (with ClientID)
-		if err := sess.sendToHost(protocol.Message{
+		// Notify host that client left (with ClientID).
+		// Best-effort: may fail if the host disconnects concurrently.
+		sess.sendToHost(protocol.Message{
 			Type:     protocol.MsgPeerEvent,
 			Event:    "left",
 			ClientID: clientID,
-		}); err != nil {
-			log.Printf("notify host of client leave: %v", err)
-		}
+		})
 	}()
 
 	// Read messages from client and forward to host with ClientID injected
