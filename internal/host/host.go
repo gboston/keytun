@@ -248,6 +248,11 @@ func (h *Host) ClientJoined() <-chan struct{} {
 	return h.clientJoined
 }
 
+// KeyReady returns a channel that is closed when the first client key exchange completes.
+func (h *Host) KeyReady() <-chan struct{} {
+	return h.keyReady
+}
+
 // ReadOutputUntil reads buffered output until it contains the target
 // string or the timeout expires.
 func (h *Host) ReadOutputUntil(target string, timeout time.Duration) string {

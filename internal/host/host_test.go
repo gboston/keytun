@@ -210,6 +210,14 @@ func TestHostSendsResizeToClient(t *testing.T) {
 	defer clientConn.Close()
 	clientSess := simulateClientJoinWithKeyExchange(t, clientConn, "test-owl-resize")
 
+	// Wait for host to complete its side of the key exchange so SendResize
+	// sees the session as ready.
+	select {
+	case <-h.KeyReady():
+	case <-time.After(5 * time.Second):
+		t.Fatal("key exchange did not complete in time")
+	}
+
 	// Host sends resize via UpdateTermSize (stores dims + sends)
 	h.UpdateTermSize(120, 40)
 
