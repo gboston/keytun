@@ -213,10 +213,18 @@ func TestHostSendsResizeToClient(t *testing.T) {
 	// Host sends resize via UpdateTermSize (stores dims + sends)
 	h.UpdateTermSize(120, 40)
 
-	// Client should receive an encrypted resize message
-	msg := readMsg(t, clientConn)
-	if msg.Type != protocol.MsgResize {
-		t.Errorf("expected resize, got %+v", msg)
+	// Client should receive an encrypted resize message.
+	// The PTY may emit initial output (e.g. shell prompt) that arrives before
+	// the resize, so drain output messages until we find it.
+	var msg protocol.Message
+	for {
+		msg = readMsg(t, clientConn)
+		if msg.Type == protocol.MsgResize {
+			break
+		}
+		if msg.Type != protocol.MsgOutput {
+			t.Fatalf("expected resize or output, got %+v", msg)
+		}
 	}
 	// Dimensions should be encrypted in Data, not cleartext
 	if msg.Cols != 0 || msg.Rows != 0 {

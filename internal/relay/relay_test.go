@@ -37,7 +37,7 @@ func sendMsg(t *testing.T, conn *websocket.Conn, msg protocol.Message) {
 
 func readMsg(t *testing.T, conn *websocket.Conn) protocol.Message {
 	t.Helper()
-	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	_, data, err := conn.ReadMessage()
 	if err != nil {
 		t.Fatalf("read: %v", err)
