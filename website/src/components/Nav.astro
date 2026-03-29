@@ -1,6 +1,6 @@
 ---
 // ABOUTME: Fixed navigation bar with logo, anchor links, GitHub link, and theme toggle.
-// ABOUTME: Uses backdrop blur and keycap-styled toggle button.
+// ABOUTME: Uses backdrop blur and keycap-styled toggle button. Hamburger menu on mobile.
 ---
 
 <nav>
@@ -14,6 +14,7 @@
 			<a href="/#install">Install</a>
 			<a href="/join">Join</a>
 			<a href="/faq">FAQ</a>
+			<a href="/changelog">Changelog</a>
 			<a href="https://github.com/gboston/keytun" class="nav-github" target="_blank" rel="noopener" aria-label="GitHub">
 				<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
 			</a>
@@ -22,8 +23,61 @@
 				<span class="toggle-icon toggle-moon">☾</span>
 			</button>
 		</div>
+		<div class="nav-mobile-actions">
+			<button class="theme-toggle" id="theme-toggle-mobile" aria-label="Toggle dark mode">
+				<span class="toggle-icon toggle-sun">☀</span>
+				<span class="toggle-icon toggle-moon">☾</span>
+			</button>
+			<button class="hamburger" id="hamburger" aria-label="Open menu" aria-expanded="false">
+				<span class="hamburger-line"></span>
+				<span class="hamburger-line"></span>
+				<span class="hamburger-line"></span>
+			</button>
+		</div>
+	</div>
+	<div class="mobile-menu" id="mobile-menu" aria-hidden="true">
+		<a href="/#how-it-works">How it works</a>
+		<a href="/#install">Install</a>
+		<a href="/join">Join</a>
+		<a href="/faq">FAQ</a>
+		<a href="/changelog">Changelog</a>
+		<a href="https://github.com/gboston/keytun" target="_blank" rel="noopener">GitHub</a>
 	</div>
 </nav>
+
+<script>
+	function initMobileMenu() {
+		const hamburger = document.getElementById('hamburger');
+		const menu = document.getElementById('mobile-menu');
+		if (!hamburger || !menu) return;
+
+		hamburger.addEventListener('click', () => {
+			const isOpen = menu.classList.toggle('is-open');
+			hamburger.classList.toggle('is-open', isOpen);
+			hamburger.setAttribute('aria-expanded', String(isOpen));
+			menu.setAttribute('aria-hidden', String(!isOpen));
+		});
+
+		// Close menu when a link is clicked
+		menu.querySelectorAll('a').forEach(link => {
+			link.addEventListener('click', () => {
+				menu.classList.remove('is-open');
+				hamburger.classList.remove('is-open');
+				hamburger.setAttribute('aria-expanded', 'false');
+				menu.setAttribute('aria-hidden', 'true');
+			});
+		});
+
+		// Wire up mobile theme toggle to mirror the desktop one
+		const mobileTgl = document.getElementById('theme-toggle-mobile');
+		const desktopTgl = document.getElementById('theme-toggle');
+		if (mobileTgl && desktopTgl) {
+			mobileTgl.addEventListener('click', () => desktopTgl.click());
+		}
+	}
+	initMobileMenu();
+	document.addEventListener('astro:after-swap', initMobileMenu);
+</script>
 
 <style>
 	nav {
@@ -149,15 +203,87 @@
 		transform: scale(1);
 	}
 
-	@media (max-width: 480px) {
-		.nav-links a:not(.nav-github) {
-			display: none;
-		}
+	/* ---- Hamburger (hidden on desktop) ---- */
+	.nav-mobile-actions {
+		display: none;
+		align-items: center;
+		gap: 8px;
 	}
 
+	.hamburger {
+		width: 36px;
+		height: 36px;
+		border: none;
+		background: transparent;
+		cursor: pointer;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 5px;
+		padding: 6px;
+	}
+
+	.hamburger-line {
+		display: block;
+		width: 20px;
+		height: 2px;
+		background: var(--text);
+		border-radius: 1px;
+		transition: transform 0.25s, opacity 0.25s;
+	}
+
+	.hamburger.is-open .hamburger-line:nth-child(1) {
+		transform: translateY(7px) rotate(45deg);
+	}
+
+	.hamburger.is-open .hamburger-line:nth-child(2) {
+		opacity: 0;
+	}
+
+	.hamburger.is-open .hamburger-line:nth-child(3) {
+		transform: translateY(-7px) rotate(-45deg);
+	}
+
+	/* ---- Mobile Menu ---- */
+	.mobile-menu {
+		display: none;
+		flex-direction: column;
+		padding: 8px 24px 20px;
+		border-top: 1px solid var(--border);
+		background: var(--nav-bg);
+		backdrop-filter: blur(16px);
+	}
+
+	.mobile-menu a {
+		display: block;
+		padding: 12px 0;
+		color: var(--text-dim);
+		font-size: 0.95rem;
+		font-weight: 500;
+		border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+	}
+
+	.mobile-menu a:last-child {
+		border-bottom: none;
+	}
+
+	.mobile-menu a:hover {
+		color: var(--text);
+	}
+
+	/* ---- Responsive ---- */
 	@media (max-width: 768px) {
 		.nav-links {
-			gap: 16px;
+			display: none;
+		}
+
+		.nav-mobile-actions {
+			display: flex;
+		}
+
+		.mobile-menu.is-open {
+			display: flex;
 		}
 	}
 </style>

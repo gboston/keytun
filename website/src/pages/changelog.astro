@@ -1,0 +1,244 @@
+---
+// ABOUTME: Changelog page listing all keytun releases with dates and highlights.
+// ABOUTME: Displays version history in reverse chronological order.
+import Layout from '../layouts/Layout.astro';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<Layout title="Changelog — keytun" description="Release history and changelog for keytun.">
+	<Nav />
+	<main id="main-content" class="changelog-page">
+		<div class="container">
+			<h1>Changelog</h1>
+			<p class="changelog-intro">All notable changes to keytun, listed by release.</p>
+
+			<div class="release">
+				<div class="release-header">
+					<h2>v0.7.0</h2>
+					<time datetime="2026-03-28">March 28, 2026</time>
+				</div>
+				<ul>
+					<li><span class="tag tag-feat">feat</span> Fan-out support for multiple simultaneous clients per session</li>
+					<li><span class="tag tag-feat">feat</span> Persistent terminal title and login shell PTY</li>
+					<li><span class="tag tag-fix">fix</span> Data races, security hardening, and reliability improvements</li>
+					<li><span class="tag tag-fix">fix</span> Host exits immediately when shell exits</li>
+					<li><span class="tag tag-fix">fix</span> Multi-platform Docker builds with BUILDPLATFORM</li>
+				</ul>
+			</div>
+
+			<div class="release">
+				<div class="release-header">
+					<h2>v0.6.0</h2>
+					<time datetime="2026-03-28">March 28, 2026</time>
+				</div>
+				<ul>
+					<li><span class="tag tag-feat">feat</span> Linux binary builds in release pipeline</li>
+				</ul>
+			</div>
+
+			<div class="release">
+				<div class="release-header">
+					<h2>v0.5.0</h2>
+					<time datetime="2026-03-27">March 27, 2026</time>
+				</div>
+				<ul>
+					<li><span class="tag tag-feat">feat</span> Ghostty terminal support</li>
+					<li><span class="tag tag-fix">fix</span> Clean terminal restore on host exit</li>
+				</ul>
+			</div>
+
+			<div class="release">
+				<div class="release-header">
+					<h2>v0.4.1</h2>
+					<time datetime="2026-03-27">March 27, 2026</time>
+				</div>
+				<ul>
+					<li><span class="tag tag-fix">fix</span> Prevent concurrent WebSocket write panic on host</li>
+				</ul>
+			</div>
+
+			<div class="release">
+				<div class="release-header">
+					<h2>v0.4.0</h2>
+					<time datetime="2026-03-27">March 27, 2026</time>
+				</div>
+				<ul>
+					<li><span class="tag tag-security">security</span> Harden relay against session brute-forcing</li>
+				</ul>
+			</div>
+
+			<div class="release">
+				<div class="release-header">
+					<h2>v0.3.2</h2>
+					<time datetime="2026-03-27">March 27, 2026</time>
+				</div>
+				<ul>
+					<li><span class="tag tag-feat">feat</span> Echo keystrokes back to client in system mode</li>
+				</ul>
+			</div>
+
+			<div class="release">
+				<div class="release-header">
+					<h2>v0.3.1</h2>
+					<time datetime="2026-03-27">March 27, 2026</time>
+				</div>
+				<ul>
+					<li><span class="tag tag-fix">fix</span> Terminal resizing</li>
+				</ul>
+			</div>
+
+			<div class="release">
+				<div class="release-header">
+					<h2>v0.3.0</h2>
+					<time datetime="2026-03-27">March 27, 2026</time>
+				</div>
+				<ul>
+					<li><span class="tag tag-feat">feat</span> Direct join links and web client</li>
+				</ul>
+			</div>
+
+			<div class="release">
+				<div class="release-header">
+					<h2>v0.2.1</h2>
+					<time datetime="2026-03-26">March 26, 2026</time>
+				</div>
+				<ul>
+					<li><span class="tag tag-fix">fix</span> Enable CGO in release build for macOS system mode</li>
+				</ul>
+			</div>
+
+			<div class="release">
+				<div class="release-header">
+					<h2>v0.2.0</h2>
+					<time datetime="2026-03-26">March 26, 2026</time>
+				</div>
+				<ul>
+					<li><span class="tag tag-feat">feat</span> Default public relay, dynamic version injection</li>
+				</ul>
+			</div>
+
+			<div class="release">
+				<div class="release-header">
+					<h2>v0.1.0</h2>
+					<time datetime="2026-03-26">March 26, 2026</time>
+				</div>
+				<ul>
+					<li>Initial release with terminal mode, system mode, and relay server</li>
+				</ul>
+			</div>
+		</div>
+	</main>
+	<Footer />
+</Layout>
+
+<style>
+	.changelog-page {
+		padding: 120px 0 80px;
+		min-height: 100vh;
+	}
+
+	.changelog-page .container {
+		max-width: 720px;
+	}
+
+	.changelog-page h1 {
+		font-family: var(--font-display);
+		font-size: clamp(1.8rem, 4vw, 2.4rem);
+		font-weight: 700;
+		letter-spacing: -0.03em;
+		margin-bottom: 8px;
+	}
+
+	.changelog-intro {
+		color: var(--text-muted);
+		font-size: 0.95rem;
+		margin-bottom: 48px;
+	}
+
+	/* Release block */
+	.release {
+		margin-bottom: 24px;
+	}
+
+	.release-header {
+		display: flex;
+		align-items: baseline;
+		gap: 12px;
+		margin-bottom: 8px;
+	}
+
+	.release-header h2 {
+		font-family: var(--font-mono);
+		font-size: 1.05rem;
+		font-weight: 700;
+		letter-spacing: -0.01em;
+		color: var(--text);
+		margin: 0;
+	}
+
+	.release-header time {
+		font-size: 0.82rem;
+		color: var(--text-muted);
+		font-family: var(--font-mono);
+	}
+
+	.release ul {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+	}
+
+	.release li {
+		font-size: 0.9rem;
+		line-height: 1.7;
+		color: var(--text-dim);
+		padding: 4px 0;
+	}
+
+	/* Tags */
+	.tag {
+		display: inline-block;
+		font-size: 0.68rem;
+		font-weight: 700;
+		font-family: var(--font-mono);
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		padding: 2px 7px;
+		border-radius: 4px;
+		margin-right: 6px;
+		vertical-align: middle;
+	}
+
+	.tag-feat {
+		color: var(--accent-mint);
+		background: color-mix(in srgb, var(--accent-mint) 12%, transparent);
+	}
+
+	.tag-fix {
+		color: var(--accent-peach);
+		background: color-mix(in srgb, var(--accent-peach) 12%, transparent);
+	}
+
+	.tag-security {
+		color: var(--accent-coral);
+		background: color-mix(in srgb, var(--accent-coral) 12%, transparent);
+	}
+
+	/* Separator between releases */
+	.release + .release {
+		padding-top: 24px;
+		border-top: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+	}
+
+	@media (max-width: 480px) {
+		.changelog-page {
+			padding: 100px 0 60px;
+		}
+
+		.release-header {
+			flex-direction: column;
+			gap: 4px;
+		}
+	}
+</style>
