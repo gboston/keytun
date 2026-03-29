@@ -7,11 +7,13 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/creack/pty"
 	"github.com/gboston/keytun/internal/host"
 	"github.com/gboston/keytun/internal/inject"
 	"github.com/gboston/keytun/internal/session"
+	"github.com/gboston/keytun/internal/ui"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -37,13 +39,61 @@ var hostCmd = &cobra.Command{
 	},
 }
 
-func runTerminalMode(code string) error {
-	fmt.Printf("keytun %s\n", Version)
-	fmt.Printf("Session: %s\n", code)
-	fmt.Printf("Join:    https://keytun.com/s/%s\n", code)
-	fmt.Println("Waiting for client... (share the link with your colleague)")
-	fmt.Println("Press Ctrl+C to cancel. Type 'exit' to end the session.")
+func printSessionBox(code string) {
+	joinURL := fmt.Sprintf("https://keytun.com/s/%s", code)
+	clipNote := ""
+	if ui.CopyToClipboard(joinURL) {
+		clipNote = ui.Dim(" (copied to clipboard)")
+	}
+
+	lines := []string{
+		fmt.Sprintf("%s  %s", ui.Dim("Session:"), ui.Bold(ui.Green(code))),
+		fmt.Sprintf("%s     %s%s", ui.Dim("Join:"), ui.Cyan(joinURL), clipNote),
+	}
+	visible := []int{
+		len("Session:  ") + len(code),
+		len("Join:     ") + len(joinURL),
+	}
+	if clipNote != "" {
+		visible[1] += len(" (copied to clipboard)")
+	}
 	fmt.Println()
+	ui.Box(os.Stdout, lines, visible)
+}
+
+func formatDuration(d time.Duration) string {
+	d = d.Round(time.Second)
+	h := int(d.Hours())
+	m := int(d.Minutes()) % 60
+	s := int(d.Seconds()) % 60
+	if h > 0 {
+		return fmt.Sprintf("%dh%dm%ds", h, m, s)
+	}
+	if m > 0 {
+		return fmt.Sprintf("%dm%ds", m, s)
+	}
+	return fmt.Sprintf("%ds", s)
+}
+
+func formatBytes(n int64) string {
+	if n < 1024 {
+		return fmt.Sprintf("%d bytes", n)
+	}
+	return fmt.Sprintf("%.1f KB", float64(n)/1024)
+}
+
+func printSessionSummary(stats host.SessionStats) {
+	fmt.Println()
+	fmt.Println(ui.Dim("─── session ended ───"))
+	fmt.Printf("  %s %s\n", ui.Dim("Duration:"), formatDuration(stats.Duration))
+	fmt.Printf("  %s %s\n", ui.Dim("Input:"), formatBytes(stats.InputBytes))
+	fmt.Printf("  %s %d join(s), %d disconnect(s)\n", ui.Dim("Clients:"), stats.TotalJoins, stats.TotalLeaves)
+	fmt.Println(ui.Dim("─────────────────────"))
+}
+
+func runTerminalMode(code string) error {
+	fmt.Printf("%s %s\n", ui.Bold("keytun"), ui.Dim(Version))
+	printSessionBox(code)
 
 	inj, err := inject.NewPTY()
 	if err != nil {
@@ -56,6 +106,13 @@ func runTerminalMode(code string) error {
 		return fmt.Errorf("failed to start host: %w", err)
 	}
 	defer h.Close()
+
+	// Show a spinner while waiting for the first client to join
+	spinner := ui.NewSpinner(os.Stdout, "Waiting for client... (share the link with your colleague)")
+	go func() {
+		<-h.ClientJoined()
+		spinner.Stop()
+	}()
 
 	// Handle window size changes — resize the PTY and notify the client
 	ch := make(chan os.Signal, 1)
@@ -114,9 +171,11 @@ func runTerminalMode(code string) error {
 				if buf[i] == 0x03 {
 					// Close host first so goroutines stop writing to stdout,
 					// then restore the terminal to avoid garbled output.
+					stats := h.Stats()
 					h.Close()
 					h.ClearTerminalTitle()
 					term.Restore(ttyFd, oldState)
+					printSessionSummary(stats)
 					return nil
 				}
 			}
@@ -128,9 +187,11 @@ func runTerminalMode(code string) error {
 
 	// Close host first so goroutines stop writing to stdout,
 	// then restore the terminal to avoid garbled output.
+	stats := h.Stats()
 	h.Close()
 	h.ClearTerminalTitle()
 	term.Restore(ttyFd, oldState)
+	printSessionSummary(stats)
 	return nil
 }
 
@@ -154,26 +215,33 @@ func runSystemMode(code string) error {
 	}
 	defer h.Close()
 
-	fmt.Printf("keytun %s (system mode)\n", Version)
-	fmt.Printf("Session: %s\n", code)
-	fmt.Printf("Join:    https://keytun.com/s/%s\n", code)
+	fmt.Printf("%s %s %s\n", ui.Bold("keytun"), ui.Dim(Version), ui.Dim("(system mode)"))
+	printSessionBox(code)
 	if hostTarget != "" {
-		fmt.Printf("Keystrokes will be injected into %s.\n", hostTarget)
+		fmt.Printf("%s Keystrokes will be injected into %s.\n", ui.Dim("▸"), ui.Bold(hostTarget))
 	} else {
-		fmt.Println("Keystrokes will be injected into the focused app.")
+		fmt.Printf("%s Keystrokes will be injected into the focused app.\n", ui.Dim("▸"))
 	}
-	fmt.Println("Press Ctrl+C to stop.")
+
+	// Show a spinner while waiting for the first client to join
+	spinner := ui.NewSpinner(os.Stdout, "Waiting for client... (share the link with your colleague)")
+	go func() {
+		<-h.ClientJoined()
+		spinner.Stop()
+	}()
+
+	fmt.Println(ui.Dim("Press Ctrl+C to stop."))
 
 	// Block until SIGINT/SIGTERM or host done
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	select {
 	case <-sig:
-		fmt.Println("\nStopped.")
 	case <-h.Done():
-		fmt.Println("Session ended.")
 	}
 
+	stats := h.Stats()
+	printSessionSummary(stats)
 	return nil
 }
 

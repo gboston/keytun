@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gboston/keytun/internal/relay"
+	"github.com/gboston/keytun/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -42,14 +43,14 @@ var relayCmd = &cobra.Command{
 
 		go func() {
 			<-ctx.Done()
-			fmt.Println("\nshutting down relay...")
+			fmt.Println(ui.Dim("\nshutting down relay..."))
 			r.CloseAllSessions()
 			shutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			srv.Shutdown(shutCtx)
 		}()
 
-		fmt.Printf("keytun relay listening on %s\n", addr)
+		fmt.Printf("%s %s listening on %s\n", ui.Bold("keytun relay"), ui.Dim(Version), ui.Green(addr))
 		if err := srv.Serve(ln); err != http.ErrServerClosed {
 			return err
 		}

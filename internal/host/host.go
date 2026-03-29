@@ -14,6 +14,7 @@ import (
 	"github.com/gboston/keytun/internal/crypto"
 	"github.com/gboston/keytun/internal/inject"
 	"github.com/gboston/keytun/internal/protocol"
+	"github.com/gboston/keytun/internal/ui"
 	"github.com/gorilla/websocket"
 )
 
@@ -43,6 +44,16 @@ type Host struct {
 	termCols         uint16
 	termRows         uint16
 	termMu           sync.Mutex
+
+	// Activity pulse: signals input activity for terminal title updates
+	activityCh       chan struct{}
+
+	// Session statistics
+	startTime        time.Time
+	inputCount       int64
+	inputMu          sync.Mutex
+	totalJoins       int
+	totalLeaves      int
 }
 
 // New creates a new Host that connects to the relay and uses the given injector.
@@ -98,6 +109,8 @@ func New(relayURL string, sessionCode string, injector inject.Injector, localOut
 		keyReady:       make(chan struct{}),
 		done:           make(chan struct{}),
 		clientJoined:   make(chan struct{}),
+		activityCh:     make(chan struct{}, 1),
+		startTime:      time.Now(),
 	}
 
 	// Configure WebSocket keepalive so dead connections are detected quickly
@@ -111,6 +124,10 @@ func New(relayURL string, sessionCode string, injector inject.Injector, localOut
 
 	// Set initial terminal title showing the session is waiting for a client
 	h.setTerminalTitle("waiting")
+
+	// Activity pulse: briefly shows "●" in the terminal title when keystrokes arrive
+	h.wg.Add(1)
+	go h.activityPulse()
 
 	// Only read output if the injector produces it (e.g. PTY mode)
 	if injector.HasOutput() {
@@ -206,6 +223,37 @@ func (h *Host) writeMessage(msgType int, data []byte) error {
 	return h.conn.WriteMessage(msgType, data)
 }
 
+// activityPulse watches for input activity and briefly shows a "●" in the
+// terminal title, then fades it back after a short delay.
+func (h *Host) activityPulse() {
+	defer h.wg.Done()
+	for {
+		select {
+		case <-h.done:
+			return
+		case <-h.activityCh:
+			h.cryptoMu.RLock()
+			count := len(h.cryptoSessions)
+			h.cryptoMu.RUnlock()
+			if count > 0 {
+				h.setTerminalTitle(clientCountStatus(count) + " ●")
+				// Wait briefly then restore the normal title
+				select {
+				case <-h.done:
+					return
+				case <-time.After(300 * time.Millisecond):
+					h.cryptoMu.RLock()
+					count = len(h.cryptoSessions)
+					h.cryptoMu.RUnlock()
+					if count > 0 {
+						h.setTerminalTitle(clientCountStatus(count))
+					}
+				}
+			}
+		}
+	}
+}
+
 // pingLoop sends periodic WebSocket pings to keep the connection alive.
 func (h *Host) pingLoop() {
 	defer h.wg.Done()
@@ -246,6 +294,27 @@ func (h *Host) ClearTerminalTitle() {
 	h.localOutMu.Lock()
 	io.WriteString(h.localOut, title)
 	h.localOutMu.Unlock()
+}
+
+// SessionStats returns statistics about the session for display on exit.
+type SessionStats struct {
+	Duration    time.Duration
+	InputBytes  int64
+	TotalJoins  int
+	TotalLeaves int
+}
+
+// Stats returns session statistics.
+func (h *Host) Stats() SessionStats {
+	h.inputMu.Lock()
+	ic := h.inputCount
+	h.inputMu.Unlock()
+	return SessionStats{
+		Duration:    time.Since(h.startTime),
+		InputBytes:  ic,
+		TotalJoins:  h.totalJoins,
+		TotalLeaves: h.totalLeaves,
+	}
 }
 
 // Close shuts down the host session and waits for all goroutines to finish.
@@ -432,6 +501,14 @@ func (h *Host) readRelayMessages() {
 				continue
 			}
 			h.injector.Inject(plaintext)
+			h.inputMu.Lock()
+			h.inputCount += int64(len(plaintext))
+			h.inputMu.Unlock()
+			// Signal activity for terminal title pulse
+			select {
+			case h.activityCh <- struct{}{}:
+			default:
+			}
 
 			// In system mode there is no output stream, so echo input
 			// back to all clients so everyone can see what was typed.
@@ -460,6 +537,14 @@ func (h *Host) readRelayMessages() {
 				// already closed from a previous key exchange
 			default:
 				close(h.keyReady)
+			}
+
+			// Show encryption confirmation on host terminal
+			if h.localOut != nil {
+				encBanner := ui.Green("[keytun] encrypted session established (AES-256-GCM)")
+				h.localOutMu.Lock()
+				io.WriteString(h.localOut, fmt.Sprintf("\r\n%s\r\n", encBanner))
+				h.localOutMu.Unlock()
 			}
 
 			// In system mode, send a banner to this specific client so they know
@@ -499,18 +584,20 @@ func (h *Host) readRelayMessages() {
 				}
 
 				h.setTerminalTitle(clientCountStatus(count))
-				banner = fmt.Sprintf("\r\n[keytun] client connected (%s)\r\n", clientCountLabel(count, "total"))
+				h.totalJoins++
+				banner = fmt.Sprintf("\r\n%s\a\r\n", ui.Green(fmt.Sprintf("[keytun] client connected (%s)", clientCountLabel(count, "total"))))
 			} else if msg.Event == "left" {
 				h.cryptoMu.Lock()
 				delete(h.cryptoSessions, msg.ClientID)
 				count := len(h.cryptoSessions)
 				h.cryptoMu.Unlock()
+				h.totalLeaves++
 				if count == 0 {
 					h.setTerminalTitle("no clients — waiting")
-					banner = "\r\n[keytun] client disconnected — session still open, waiting for reconnect...\r\n"
+					banner = fmt.Sprintf("\r\n%s\r\n", ui.Yellow("[keytun] client disconnected — session still open, waiting for reconnect..."))
 				} else {
 					h.setTerminalTitle(clientCountStatus(count))
-					banner = fmt.Sprintf("\r\n[keytun] client disconnected (%s)\r\n", clientCountLabel(count, "remaining"))
+					banner = fmt.Sprintf("\r\n%s\r\n", ui.Yellow(fmt.Sprintf("[keytun] client disconnected (%s)", clientCountLabel(count, "remaining"))))
 				}
 			}
 			if banner != "" {

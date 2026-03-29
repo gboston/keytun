@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gboston/keytun/internal/client"
+	"github.com/gboston/keytun/internal/ui"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -41,12 +42,12 @@ var joinCmd = &cobra.Command{
 					if firstConnect {
 						return fmt.Errorf("failed to join session: %w", err)
 					}
-					fmt.Fprintf(os.Stderr, "\r\n[keytun] session ended (host disconnected)\r\n")
+					fmt.Fprintf(os.Stderr, "\r\n%s\r\n", ui.Yellow("[keytun] session ended (host disconnected)"))
 					return nil
 				}
 				attempt++
 				delay := backoffDelay(attempt, initialDelay, maxDelay, multiplier, jitter)
-				fmt.Fprintf(os.Stderr, "[keytun] connection failed, retrying in %s... (attempt %d)\n", delay.Round(time.Millisecond), attempt)
+				fmt.Fprintf(os.Stderr, "%s\n", ui.Yellowf("[keytun] connection failed, retrying in %s... (attempt %d)", delay.Round(time.Millisecond), attempt))
 				time.Sleep(delay)
 				continue
 			}
@@ -59,13 +60,13 @@ var joinCmd = &cobra.Command{
 			})
 
 			if firstConnect {
-				fmt.Printf("Connected to %s\n", sessionCode)
-				fmt.Println("You are now typing into the remote terminal.")
-				fmt.Println("Press Escape twice to disconnect.")
+				fmt.Printf("%s %s\n", ui.Green("Connected to"), ui.Bold(ui.Green(sessionCode)))
+				fmt.Println(ui.Dim("You are now typing into the remote terminal."))
+				fmt.Println(ui.Dim("Press Escape twice to disconnect."))
 				fmt.Println()
 				firstConnect = false
 			} else {
-				fmt.Fprintf(os.Stderr, "\r\n[keytun] reconnected to %s\r\n", sessionCode)
+				fmt.Fprintf(os.Stderr, "\r\n%s\r\n", ui.Greenf("[keytun] reconnected to %s", sessionCode))
 			}
 
 			reason := runInputLoop(c)
@@ -77,7 +78,7 @@ var joinCmd = &cobra.Command{
 			case loopConnectionLost:
 				attempt++
 				delay := backoffDelay(attempt, initialDelay, maxDelay, multiplier, jitter)
-				fmt.Fprintf(os.Stderr, "\r\n[keytun] connection lost, reconnecting in %s... (attempt %d)\r\n", delay.Round(time.Millisecond), attempt)
+				fmt.Fprintf(os.Stderr, "\r\n%s\r\n", ui.Yellowf("[keytun] connection lost, reconnecting in %s... (attempt %d)", delay.Round(time.Millisecond), attempt))
 				time.Sleep(delay)
 				continue
 			case loopStdinError:
