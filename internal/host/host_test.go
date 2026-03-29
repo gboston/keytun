@@ -386,7 +386,7 @@ func TestHostClientJoinedChannel(t *testing.T) {
 	server := setupRelay(t)
 	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 
-	inj := newPTYInjector(t)
+	inj := &noOutputInjector{}
 	h, err := New(relayURL, "test-joined-01", inj)
 	if err != nil {
 		t.Fatalf("New: %v", err)
