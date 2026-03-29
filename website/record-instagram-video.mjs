@@ -27,7 +27,6 @@ const SECTIONS = [
   { name: '05-features',     selector: '.features',       hold: 3.0, fallback: '#showcase' },
   { name: '06-install',      selector: '#install',        hold: 3.0 },
   { name: '07-roadmap',      selector: '.roadmap',        hold: 2.5, fallback: '#install' },
-  { name: '08-footer',       selector: 'footer',          hold: 2.0 },
 ];
 
 const CROSSFADE_DURATION = 0.3; // seconds overlap between cuts
@@ -161,6 +160,15 @@ async function main() {
   console.log('Loading page...');
   await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await sleep(2000); // Let animations play
+
+  // Dismiss cookie/analytics consent banner
+  console.log('Dismissing consent banner...');
+  await page.evaluate(() => {
+    localStorage.setItem('analytics_consent', 'no');
+    const banner = document.getElementById('consent-banner');
+    if (banner) banner.remove();
+  });
+  await sleep(300);
 
   console.log('Capturing sections...');
   const shots = await captureScreenshots(page);
