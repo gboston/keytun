@@ -17,6 +17,8 @@ const (
 	MsgKeyExchange    MessageType = "key_exchange"
 	MsgVerify         MessageType = "verify"
 	MsgResize         MessageType = "resize"
+	MsgPing           MessageType = "ping"
+	MsgPong           MessageType = "pong"
 )
 
 // Message is the envelope for all keytun protocol messages.

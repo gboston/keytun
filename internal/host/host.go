@@ -52,6 +52,11 @@ type Host struct {
 	// Activity pulse: signals input activity for terminal title updates
 	activityCh       chan struct{}
 
+	// Latency tracking: per-client pending pings and measured RTTs
+	pendingPings     map[string]time.Time // clientID -> ping sent time
+	clientLatencies  map[string]time.Duration // clientID -> latest RTT
+	latencyMu        sync.Mutex
+
 	// Session statistics
 	startTime        time.Time
 	inputCount       int64
@@ -114,6 +119,8 @@ func New(relayURL string, sessionCode string, injector inject.Injector, localOut
 		done:           make(chan struct{}),
 		clientJoined:   make(chan struct{}),
 		activityCh:     make(chan struct{}, 1),
+		pendingPings:   make(map[string]time.Time),
+		clientLatencies: make(map[string]time.Duration),
 		startTime:      time.Now(),
 	}
 
@@ -132,6 +139,10 @@ func New(relayURL string, sessionCode string, injector inject.Injector, localOut
 	// Activity pulse: briefly shows "●" in the terminal title when keystrokes arrive
 	h.wg.Add(1)
 	go h.activityPulse()
+
+	// Start latency measurement pings to connected clients
+	h.wg.Add(1)
+	go h.latencyPingLoop()
 
 	// Only read output if the injector produces it (e.g. PTY mode)
 	if injector.HasOutput() {
@@ -262,6 +273,80 @@ func (h *Host) activityPulse() {
 			}
 		}
 	}
+}
+
+// latencyPingInterval controls how often the host sends app-level pings to clients.
+const latencyPingInterval = 5 * time.Second
+
+// latencyPingLoop sends periodic app-level pings to all verified clients
+// and records the send time so that incoming pongs can compute RTT.
+func (h *Host) latencyPingLoop() {
+	defer h.wg.Done()
+
+	// Wait for at least one client to complete key exchange
+	select {
+	case <-h.keyReady:
+	case <-h.done:
+		return
+	}
+
+	ticker := time.NewTicker(latencyPingInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-h.done:
+			return
+		case <-ticker.C:
+			now := time.Now()
+			token := fmt.Sprintf("%d", now.UnixMilli())
+			h.cryptoMu.RLock()
+			for clientID, sess := range h.cryptoSessions {
+				if !sess.IsReady() {
+					continue
+				}
+				msg := protocol.Message{
+					Type:     protocol.MsgPing,
+					Data:     token,
+					ClientID: clientID,
+				}
+				data, _ := json.Marshal(msg)
+				h.latencyMu.Lock()
+				h.pendingPings[clientID] = now
+				h.latencyMu.Unlock()
+				h.writeMessage(websocket.TextMessage, data)
+			}
+			h.cryptoMu.RUnlock()
+		}
+	}
+}
+
+// ClientLatency returns the average latency across all connected clients.
+// Returns 0 if no latency data is available yet.
+func (h *Host) ClientLatency() time.Duration {
+	h.latencyMu.Lock()
+	defer h.latencyMu.Unlock()
+	if len(h.clientLatencies) == 0 {
+		return 0
+	}
+	var total time.Duration
+	for _, d := range h.clientLatencies {
+		total += d
+	}
+	return total / time.Duration(len(h.clientLatencies))
+}
+
+// latencyStatus returns a string like "42ms" for the terminal title,
+// or empty if no latency data is available.
+func (h *Host) latencyStatus() string {
+	lat := h.ClientLatency()
+	if lat == 0 {
+		return ""
+	}
+	ms := lat.Milliseconds()
+	if ms < 1 {
+		return "<1ms"
+	}
+	return fmt.Sprintf("%dms", ms)
 }
 
 // pingLoop sends periodic WebSocket pings to keep the connection alive.
@@ -610,6 +695,36 @@ func (h *Host) readRelayMessages() {
 				banner := "\x1b[90m[system mode — keystrokes are echoed, no application output]\x1b[0m\r\n"
 				h.sendEncryptedOutputTo(msg.ClientID, []byte(banner))
 			}
+		case protocol.MsgPing:
+			// Client sent a ping — respond with pong echoing the same data
+			pong := protocol.Message{
+				Type:     protocol.MsgPong,
+				Data:     msg.Data,
+				ClientID: msg.ClientID,
+			}
+			data, _ := json.Marshal(pong)
+			h.writeMessage(websocket.TextMessage, data)
+		case protocol.MsgPong:
+			// Client responded to our ping — compute RTT
+			h.latencyMu.Lock()
+			if sent, ok := h.pendingPings[msg.ClientID]; ok {
+				rtt := time.Since(sent)
+				h.clientLatencies[msg.ClientID] = rtt
+				delete(h.pendingPings, msg.ClientID)
+			}
+			h.latencyMu.Unlock()
+
+			// Update terminal title with latency
+			h.cryptoMu.RLock()
+			count := len(h.cryptoSessions)
+			h.cryptoMu.RUnlock()
+			if count > 0 {
+				status := clientCountStatus(count)
+				if ls := h.latencyStatus(); ls != "" {
+					status += " · " + ls
+				}
+				h.setTerminalTitle(status)
+			}
 		case protocol.MsgPeerEvent:
 			var banner string
 			if msg.Event == "joined" {
@@ -640,6 +755,10 @@ func (h *Host) readRelayMessages() {
 				delete(h.cryptoSessions, msg.ClientID)
 				count := len(h.cryptoSessions)
 				h.cryptoMu.Unlock()
+				h.latencyMu.Lock()
+				delete(h.pendingPings, msg.ClientID)
+				delete(h.clientLatencies, msg.ClientID)
+				h.latencyMu.Unlock()
 				h.totalLeaves++
 				if count == 0 {
 					h.setTerminalTitle("no clients — waiting")

@@ -73,7 +73,28 @@ var joinCmd = &cobra.Command{
 				fmt.Fprintf(os.Stderr, "\r\n%s\r\n", ui.Greenf("[keytun] reconnected to %s", sessionCode))
 			}
 
+			// Update terminal title with latency periodically
+			titleDone := make(chan struct{})
+			go func() {
+				ticker := time.NewTicker(5 * time.Second)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-titleDone:
+						return
+					case <-ticker.C:
+						lat := c.Latency()
+						title := fmt.Sprintf("keytun: %s", sessionCode)
+						if lat > 0 {
+							title += fmt.Sprintf(" · %dms", lat.Milliseconds())
+						}
+						fmt.Fprintf(os.Stdout, "\x1b]0;%s\x07", title)
+					}
+				}
+			}()
+
 			reason := runInputLoop(c)
+			close(titleDone)
 			c.Close()
 
 			switch reason {

@@ -116,7 +116,8 @@ func runTerminalMode(code string) error {
 	}
 
 	// Show a spinner while waiting for the first client to join
-	spinner := ui.NewSpinner(os.Stdout, "Waiting for client... (share the link with your colleague)")
+	fmt.Println(ui.Dim("Share the link above with your colleague."))
+	spinner := ui.NewSpinner(os.Stdout, "Waiting for client...")
 	go func() {
 		<-h.ClientJoined()
 		spinner.Stop()
@@ -235,7 +236,8 @@ func runSystemMode(code string) error {
 	}
 
 	// Show a spinner while waiting for the first client to join
-	spinner := ui.NewSpinner(os.Stdout, "Waiting for client... (share the link with your colleague)")
+	fmt.Println(ui.Dim("Share the link above with your colleague."))
+	spinner := ui.NewSpinner(os.Stdout, "Waiting for client...")
 	go func() {
 		<-h.ClientJoined()
 		spinner.Stop()

@@ -381,3 +381,49 @@ func TestEndToEnd_HostOutputReachesClient(t *testing.T) {
 		t.Errorf("expected host output to contain 'relay-test', got: %q", output)
 	}
 }
+
+func TestEndToEnd_LatencyMeasurement(t *testing.T) {
+	server, r := startRelay(t)
+	url := wsURL(server)
+
+	inj := newPTYInjector(t)
+	h, err := host.New(url, "e2e-lat-01", inj)
+	if err != nil {
+		t.Fatalf("host.New: %v", err)
+	}
+	defer h.Close()
+	waitForSession(t, r, "e2e-lat-01", 2*time.Second)
+
+	c, err := client.New(url, "e2e-lat-01")
+	if err != nil {
+		t.Fatalf("client.New: %v", err)
+	}
+	defer c.Close()
+
+	// Wait for the latency ping/pong cycle to complete (up to 2 intervals)
+	deadline := time.Now().Add(12 * time.Second)
+	for time.Now().Before(deadline) {
+		if c.Latency() > 0 && h.ClientLatency() > 0 {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	clientLat := c.Latency()
+	hostLat := h.ClientLatency()
+
+	if clientLat <= 0 {
+		t.Errorf("expected client to have positive latency, got %v", clientLat)
+	}
+	if hostLat <= 0 {
+		t.Errorf("expected host to have positive latency, got %v", hostLat)
+	}
+
+	// Sanity check: in-process latency should be well under 1 second
+	if clientLat > time.Second {
+		t.Errorf("client latency suspiciously high: %v", clientLat)
+	}
+	if hostLat > time.Second {
+		t.Errorf("host latency suspiciously high: %v", hostLat)
+	}
+}

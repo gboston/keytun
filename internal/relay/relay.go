@@ -4,6 +4,7 @@ package relay
 
 import (
 	crypto_rand "crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"log"
@@ -17,6 +18,13 @@ import (
 	"github.com/gorilla/websocket"
 	"golang.org/x/time/rate"
 )
+
+// redactSession returns a short, opaque identifier derived from the session
+// code, safe for logging without leaking the joinable code itself.
+func redactSession(code string) string {
+	h := sha256.Sum256([]byte(code))
+	return hex.EncodeToString(h[:4])
+}
 
 // generateClientID returns an 8-character hex string from crypto/rand.
 func generateClientID() string {
@@ -56,6 +64,7 @@ func checkOrigin(r *http.Request) bool {
 			return true
 		}
 	}
+	log.Printf("rejected WebSocket connection from origin %q", origin)
 	return false
 }
 
@@ -200,10 +209,13 @@ func (r *Relay) HandleWebSocket(w http.ResponseWriter, req *http.Request) {
 
 	switch msg.Type {
 	case protocol.MsgHostRegister:
+		log.Printf("session %s: host registering from %s", redactSession(msg.Session), ip)
 		r.handleHost(conn, msg.Session)
 	case protocol.MsgClientJoin:
+		log.Printf("session %s: client joining from %s", redactSession(msg.Session), ip)
 		r.handleClient(conn, msg.Session, ip)
 	default:
+		log.Printf("unexpected first message type %q from %s", msg.Type, ip)
 		sendError(conn, "expected host_register or client_join")
 		conn.Close()
 	}
@@ -213,6 +225,7 @@ func (r *Relay) handleHost(conn *websocket.Conn, code string) {
 	r.mu.Lock()
 	if _, exists := r.sessions[code]; exists {
 		r.mu.Unlock()
+		log.Printf("session %s: registration rejected, code already in use", redactSession(code))
 		sendError(conn, "session code already in use")
 		return
 	}
@@ -229,6 +242,7 @@ func (r *Relay) handleHost(conn *websocket.Conn, code string) {
 	}
 	r.sessions[code] = sess
 	r.mu.Unlock()
+	log.Printf("session %s: host registered", redactSession(code))
 
 	configureKeepalive(conn)
 	done := make(chan struct{})
@@ -239,6 +253,7 @@ func (r *Relay) handleHost(conn *websocket.Conn, code string) {
 		r.mu.Lock()
 		delete(r.sessions, code)
 		r.mu.Unlock()
+		log.Printf("session %s: host disconnected, session closed", redactSession(code))
 		conn.Close()
 		sess.clientMu.RLock()
 		for _, c := range sess.clients {
@@ -260,7 +275,7 @@ func (r *Relay) handleHost(conn *websocket.Conn, code string) {
 			continue
 		}
 
-		if msg.Type == protocol.MsgOutput || msg.Type == protocol.MsgKeyExchange || msg.Type == protocol.MsgResize || msg.Type == protocol.MsgVerify {
+		if msg.Type == protocol.MsgOutput || msg.Type == protocol.MsgKeyExchange || msg.Type == protocol.MsgResize || msg.Type == protocol.MsgVerify || msg.Type == protocol.MsgPing || msg.Type == protocol.MsgPong {
 			sess.clientMu.RLock()
 			if msg.ClientID != "" {
 				// Targeted: send to a specific client
@@ -284,6 +299,7 @@ func (r *Relay) handleHost(conn *websocket.Conn, code string) {
 
 func (r *Relay) handleClient(conn *websocket.Conn, code string, ip string) {
 	if !r.getLimiter(ip).Allow() {
+		log.Printf("session %s: join rate-limited for IP %s", redactSession(code), ip)
 		sendError(conn, "too many requests")
 		conn.Close()
 		return
@@ -297,6 +313,7 @@ func (r *Relay) handleClient(conn *websocket.Conn, code string, ip string) {
 	sess, exists := r.sessions[code]
 	if !exists {
 		r.mu.Unlock()
+		log.Printf("session %s: client join failed, session not found", redactSession(code))
 		sendError(conn, "session not found")
 		conn.Close()
 		return
@@ -318,7 +335,9 @@ func (r *Relay) handleClient(conn *websocket.Conn, code string, ip string) {
 	// Add to session's client map
 	sess.clientMu.Lock()
 	sess.clients[clientID] = conn
+	clientCount := len(sess.clients)
 	sess.clientMu.Unlock()
+	log.Printf("session %s: client %s joined (%d client(s) connected)", redactSession(code), clientID, clientCount)
 
 	// Notify host that client joined (with ClientID).
 	// Best-effort: may fail if the host disconnects concurrently.
@@ -333,7 +352,9 @@ func (r *Relay) handleClient(conn *websocket.Conn, code string, ip string) {
 		conn.Close()
 		sess.clientMu.Lock()
 		delete(sess.clients, clientID)
+		remainingClients := len(sess.clients)
 		sess.clientMu.Unlock()
+		log.Printf("session %s: client %s left (%d client(s) remaining)", redactSession(code), clientID, remainingClients)
 		// Notify host that client left (with ClientID).
 		// Best-effort: may fail if the host disconnects concurrently.
 		sess.sendToHost(protocol.Message{
@@ -356,7 +377,7 @@ func (r *Relay) handleClient(conn *websocket.Conn, code string, ip string) {
 		}
 
 		// Forward input, key exchange, and verify messages to host, tagging with this client's ID
-		if msg.Type == protocol.MsgInput || msg.Type == protocol.MsgKeyExchange || msg.Type == protocol.MsgVerify {
+		if msg.Type == protocol.MsgInput || msg.Type == protocol.MsgKeyExchange || msg.Type == protocol.MsgVerify || msg.Type == protocol.MsgPing || msg.Type == protocol.MsgPong {
 			msg.ClientID = clientID
 			tagged, err := json.Marshal(msg)
 			if err != nil {

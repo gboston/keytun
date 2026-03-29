@@ -19,6 +19,9 @@ const (
 	pongTimeout  = 40 * time.Second
 )
 
+// latencyPingInterval controls how often the client sends app-level pings to the host.
+const latencyPingInterval = 5 * time.Second
+
 // Client manages a keytun client session.
 type Client struct {
 	conn          *websocket.Conn
@@ -28,6 +31,11 @@ type Client struct {
 	onOutputMu    sync.RWMutex
 	done          chan struct{}
 	closeOnce     sync.Once
+
+	// Latency tracking
+	pendingPing   time.Time
+	latency       time.Duration
+	latencyMu     sync.Mutex
 }
 
 // SetOnOutput registers a callback that is invoked with decrypted terminal
@@ -184,6 +192,7 @@ func New(relayURL string, sessionCode string, password ...string) (*Client, erro
 	// Read incoming messages in the background to detect connection loss.
 	go c.readLoop()
 	go c.pingLoop()
+	go c.latencyPingLoop()
 
 	return c, nil
 }
@@ -225,6 +234,24 @@ func (c *Client) readLoop() {
 				continue
 			}
 			fn(plaintext)
+		case protocol.MsgPing:
+			// Host sent a ping — respond with pong echoing the same data
+			pong := protocol.Message{
+				Type: protocol.MsgPong,
+				Data: msg.Data,
+			}
+			data, _ := json.Marshal(pong)
+			c.connMu.Lock()
+			c.conn.WriteMessage(websocket.TextMessage, data)
+			c.connMu.Unlock()
+		case protocol.MsgPong:
+			// Host responded to our ping — compute RTT
+			c.latencyMu.Lock()
+			if !c.pendingPing.IsZero() {
+				c.latency = time.Since(c.pendingPing)
+				c.pendingPing = time.Time{}
+			}
+			c.latencyMu.Unlock()
 		}
 	}
 }
@@ -246,6 +273,40 @@ func (c *Client) pingLoop() {
 			}
 		}
 	}
+}
+
+// latencyPingLoop sends periodic app-level pings to the host to measure RTT.
+func (c *Client) latencyPingLoop() {
+	ticker := time.NewTicker(latencyPingInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-c.done:
+			return
+		case <-ticker.C:
+			now := time.Now()
+			token := fmt.Sprintf("%d", now.UnixMilli())
+			msg := protocol.Message{
+				Type: protocol.MsgPing,
+				Data: token,
+			}
+			data, _ := json.Marshal(msg)
+			c.latencyMu.Lock()
+			c.pendingPing = now
+			c.latencyMu.Unlock()
+			c.connMu.Lock()
+			c.conn.WriteMessage(websocket.TextMessage, data)
+			c.connMu.Unlock()
+		}
+	}
+}
+
+// Latency returns the last measured round-trip time to the host.
+// Returns 0 if no measurement is available yet.
+func (c *Client) Latency() time.Duration {
+	c.latencyMu.Lock()
+	defer c.latencyMu.Unlock()
+	return c.latency
 }
 
 // SendInput encrypts and sends raw bytes as an input message to the relay.

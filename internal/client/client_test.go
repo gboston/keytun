@@ -533,3 +533,100 @@ func TestClientSendsControlSequences(t *testing.T) {
 		t.Errorf("expected Ctrl+C byte (0x03), got %v", plaintext)
 	}
 }
+
+func TestClientRespondsToPingWithPong(t *testing.T) {
+	server := setupRelay(t)
+	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+
+	host := registerHost(t, server, "test-rat-ping")
+	defer host.Close()
+
+	kxCh := startHostKeyExchange(t, host)
+
+	c, err := New(relayURL, "test-rat-ping")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer c.Close()
+
+	result := <-kxCh
+	if result.err != nil {
+		t.Fatalf("host key exchange: %v", result.err)
+	}
+
+	// Host sends a ping to the client
+	data, _ := json.Marshal(protocol.Message{
+		Type: protocol.MsgPing,
+		Data: "67890",
+	})
+	host.WriteMessage(websocket.TextMessage, data)
+
+	// Host should receive a pong with the same data
+	deadline := time.Now().Add(5 * time.Second)
+	found := false
+	for time.Now().Before(deadline) {
+		host.SetReadDeadline(time.Now().Add(2 * time.Second))
+		_, raw, err := host.ReadMessage()
+		if err != nil {
+			break
+		}
+		var msg protocol.Message
+		json.Unmarshal(raw, &msg)
+		if msg.Type == protocol.MsgPong && msg.Data == "67890" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected client to respond to ping with pong")
+	}
+}
+
+func TestClientTracksLatency(t *testing.T) {
+	server := setupRelay(t)
+	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+
+	host := registerHost(t, server, "test-rat-latency")
+	defer host.Close()
+
+	kxCh := startHostKeyExchange(t, host)
+
+	c, err := New(relayURL, "test-rat-latency")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer c.Close()
+
+	result := <-kxCh
+	if result.err != nil {
+		t.Fatalf("host key exchange: %v", result.err)
+	}
+
+	// Read messages from host until we get a ping from the client, then respond
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		host.SetReadDeadline(time.Now().Add(8 * time.Second))
+		_, raw, err := host.ReadMessage()
+		if err != nil {
+			break
+		}
+		var msg protocol.Message
+		json.Unmarshal(raw, &msg)
+		if msg.Type == protocol.MsgPing {
+			pong, _ := json.Marshal(protocol.Message{
+				Type: protocol.MsgPong,
+				Data: msg.Data,
+			})
+			host.WriteMessage(websocket.TextMessage, pong)
+			break
+		}
+	}
+
+	// Give the client time to process
+	time.Sleep(200 * time.Millisecond)
+
+	latency := c.Latency()
+	if latency <= 0 {
+		t.Errorf("expected positive latency, got %v", latency)
+	}
+}

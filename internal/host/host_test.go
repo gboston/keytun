@@ -803,3 +803,126 @@ func TestHostMultiClientDisconnectCleansUpSession(t *testing.T) {
 	// Verify client A's session was cleaned up (use a type assertion to check map size)
 	_ = csA // used during join, verifying A's session is removed
 }
+
+func TestHostRespondsToPingWithPong(t *testing.T) {
+	server := setupRelay(t)
+	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+
+	inj := &noOutputInjector{}
+	h, err := New(relayURL, "test-ping-01", inj)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer h.Close()
+
+	clientConn := dialWS(t, server)
+	defer clientConn.Close()
+	simulateClientJoinWithKeyExchange(t, clientConn, "test-ping-01")
+
+	// Client sends a ping
+	sendMsg(t, clientConn, protocol.Message{
+		Type: protocol.MsgPing,
+		Data: "12345",
+	})
+
+	// Host should respond with a pong containing the same data
+	deadline := time.Now().Add(5 * time.Second)
+	found := false
+	for time.Now().Before(deadline) {
+		clientConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		_, data, err := clientConn.ReadMessage()
+		if err != nil {
+			break
+		}
+		var msg protocol.Message
+		json.Unmarshal(data, &msg)
+		if msg.Type == protocol.MsgPong && msg.Data == "12345" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected host to respond to ping with pong")
+	}
+}
+
+func TestHostSendsPingsToClient(t *testing.T) {
+	server := setupRelay(t)
+	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+
+	inj := &noOutputInjector{}
+	h, err := New(relayURL, "test-ping-02", inj)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer h.Close()
+
+	clientConn := dialWS(t, server)
+	defer clientConn.Close()
+	simulateClientJoinWithKeyExchange(t, clientConn, "test-ping-02")
+
+	// Host should send a ping within the latency interval
+	deadline := time.Now().Add(10 * time.Second)
+	found := false
+	for time.Now().Before(deadline) {
+		clientConn.SetReadDeadline(time.Now().Add(8 * time.Second))
+		_, data, err := clientConn.ReadMessage()
+		if err != nil {
+			break
+		}
+		var msg protocol.Message
+		json.Unmarshal(data, &msg)
+		if msg.Type == protocol.MsgPing {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected host to send periodic pings to client")
+	}
+}
+
+func TestHostTracksClientLatency(t *testing.T) {
+	server := setupRelay(t)
+	relayURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+
+	inj := &noOutputInjector{}
+	h, err := New(relayURL, "test-ping-03", inj)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer h.Close()
+
+	clientConn := dialWS(t, server)
+	defer clientConn.Close()
+	simulateClientJoinWithKeyExchange(t, clientConn, "test-ping-03")
+
+	// Read messages until we get a ping from the host, then respond with pong
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		clientConn.SetReadDeadline(time.Now().Add(8 * time.Second))
+		_, data, err := clientConn.ReadMessage()
+		if err != nil {
+			break
+		}
+		var msg protocol.Message
+		json.Unmarshal(data, &msg)
+		if msg.Type == protocol.MsgPing {
+			// Respond with pong
+			sendMsg(t, clientConn, protocol.Message{
+				Type: protocol.MsgPong,
+				Data: msg.Data,
+			})
+			break
+		}
+	}
+
+	// Give the host time to process the pong
+	time.Sleep(200 * time.Millisecond)
+
+	// Host should now have a latency measurement
+	latency := h.ClientLatency()
+	if latency <= 0 {
+		t.Errorf("expected positive latency, got %v", latency)
+	}
+}
