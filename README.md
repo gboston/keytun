@@ -6,10 +6,11 @@
 
 <p align="center">
   <strong>Think ngrok, but for keystrokes.</strong><br/>
-  <sub>Let your colleague type into your terminal over a screenshare.</sub>
+  <sub>Let your colleague type into your terminal over a screenshare — no screen control handoff needed.</sub>
 </p>
 
 <p align="center">
+  <a href="#why">Why</a> •
   <a href="#install">Install</a> •
   <a href="#quick-start">Quick start</a> •
   <a href="#commands">Commands</a> •
@@ -21,37 +22,36 @@
 
 ---
 
-```mermaid
-sequenceDiagram
-    participant H as Host (PTY)
-    participant R as Relay (broker)
-    participant C as Client (stdin)
+<p align="center"><img src="demo.gif" alt="keytun demo" width="800" /></p>
 
-    Note over H,C: Session Setup
-    H->>R: host_register {session: "keen-fox-42"}
-    C->>R: client_join {session: "keen-fox-42"}
-    R->>C: session_joined
-    R->>H: peer_event {joined}
+```
+you@laptop:~$ keytun host
+  Session:  keen-fox-42
+  Join:     https://keytun.com/s/keen-fox-42
+  Waiting for client...
 
-    Note over H,C: E2E Key Exchange (X25519 ECDH)
-    C->>R: key_exchange {clientPubKey}
-    R->>H: key_exchange {clientPubKey}
-    H->>R: key_exchange {hostPubKey}
-    R->>C: key_exchange {hostPubKey}
-    Note over H,C: Both derive AES-256-GCM key via HKDF-SHA256
-
-    Note over H,C: Encrypted I/O (relay sees only ciphertext)
-    C->>R: input {AES-GCM(keystroke)}
-    R->>H: input {AES-GCM(keystroke)}
-    H->>H: Write to PTY
-    H->>R: output {AES-GCM(terminal output)}
-    R->>C: output {AES-GCM(terminal output)}
+  ✓ Client connected (end-to-end encrypted)
 ```
 
-1. The **host** starts a session and gets a human-readable code (e.g. `keen-fox-42`)
-2. The **client** joins using that code
-3. Keystrokes flow through the relay to the host's terminal, output flows back
-4. All data is encrypted end-to-end — the relay is a dumb pipe that cannot read keystrokes or terminal output
+## Why
+
+You're pair programming over a screenshare. Your colleague spots a bug and wants to show you a fix. Today your options are:
+
+- **Dictate keystrokes** — *"no, backtick, not single quote... up, up, no the other up"*
+- **Hand over screen control** — laggy, clunky, and you lose your place
+- **Push-and-pull through git** — for a one-line change? Really?
+
+With keytun, they just open a link and start typing. You both see the same terminal. No installs on their end, no screen control, no lag.
+
+## Features
+
+- **Single binary** — download and run, no runtime or dependencies
+- **Browser join** — your colleague clicks a link, no install needed
+- **End-to-end encrypted** — X25519 + AES-256-GCM; the relay can't read a thing
+- **Readable session codes** — `keen-fox-42`, not `a]3Kx9$f`
+- **Multiple clients** — the whole team can join the same session
+- **Self-hostable** — run your own relay with `keytun relay` or Docker
+- **System mode** — inject keystrokes into any app, not just the terminal (macOS)
 
 ## Install
 
@@ -75,33 +75,32 @@ go install github.com/gboston/keytun@latest
 
 ## Quick start
 
+**Host** (you):
 ```bash
-# Host a session (uses relay.keytun.com by default)
 keytun host
-
-# Join the session (use the code from the host output)
-keytun join keen-fox-42
 ```
 
-### Join from the browser
-
-Your colleague doesn't need to install anything. When you run `keytun host`, it prints a direct join link:
-
-```
-Join:    https://keytun.com/s/keen-fox-42
+**Client** (your colleague) — pick one:
+```bash
+keytun join keen-fox-42                     # CLI
+open https://keytun.com/s/keen-fox-42       # or just open the link in a browser
 ```
 
-Share that URL and they can type into your terminal straight from their browser.
-You can also go to [keytun.com/join](https://keytun.com/join) and enter a session code manually.
+That's it. Your colleague is now typing into your terminal.
 
-### Local relay
+### Self-hosted relay
 
-To use a local relay instead of the default:
+Don't want to use the public relay? Run your own:
 
 ```bash
-keytun relay --port 8080
-keytun host --relay ws://localhost:8080/ws
-keytun join keen-fox-42 --relay ws://localhost:8080/ws
+keytun relay --port 8080                              # start relay
+keytun host --relay ws://localhost:8080/ws             # host with your relay
+keytun join keen-fox-42 --relay ws://localhost:8080/ws  # join via your relay
+```
+
+Or use Docker:
+```bash
+docker build -t keytun . && docker run -p 8080:8080 keytun
 ```
 
 ## Commands
@@ -148,6 +147,40 @@ All data between host and client is end-to-end encrypted. The relay only sees op
 
 The relay is a dumb pipe — it cannot read keystrokes or terminal output.
 
+## How it works
+
+```mermaid
+sequenceDiagram
+    participant H as Host (PTY)
+    participant R as Relay (broker)
+    participant C as Client (stdin)
+
+    Note over H,C: Session Setup
+    H->>R: host_register {session: "keen-fox-42"}
+    C->>R: client_join {session: "keen-fox-42"}
+    R->>C: session_joined
+    R->>H: peer_event {joined}
+
+    Note over H,C: E2E Key Exchange (X25519 ECDH)
+    C->>R: key_exchange {clientPubKey}
+    R->>H: key_exchange {clientPubKey}
+    H->>R: key_exchange {hostPubKey}
+    R->>C: key_exchange {hostPubKey}
+    Note over H,C: Both derive AES-256-GCM key via HKDF-SHA256
+
+    Note over H,C: Encrypted I/O (relay sees only ciphertext)
+    C->>R: input {AES-GCM(keystroke)}
+    R->>H: input {AES-GCM(keystroke)}
+    H->>H: Write to PTY
+    H->>R: output {AES-GCM(terminal output)}
+    R->>C: output {AES-GCM(terminal output)}
+```
+
+1. The **host** starts a session and gets a human-readable code (e.g. `keen-fox-42`)
+2. The **client** joins using that code — via CLI or browser
+3. An end-to-end encrypted channel is established (the relay never sees plaintext)
+4. Keystrokes flow to the host's terminal, output flows back — in real time
+
 ## Development
 
 Requires [Go](https://go.dev/) 1.25+ and [just](https://github.com/casey/just) (install via `mise install`).
@@ -158,29 +191,6 @@ just test     # Run all tests
 just clean    # Remove compiled binary
 ```
 
-## Releasing
-
-Releases are automated via [GoReleaser](https://goreleaser.com/) and GitHub Actions.
-
-1. Add an entry in `CHANGELOG.md`
-2. Commit and tag:
-   ```bash
-   git add -A && git commit -m "release: v0.X.Y"
-   git tag v0.X.Y
-   git push origin main --tags
-   ```
-3. The `release.yml` workflow triggers on the `v*` tag push and:
-   - Builds macOS binaries (arm64 + amd64) with CGO disabled
-   - Creates a GitHub Release with the binaries and checksums
-   - Updates the Homebrew cask in `gboston/homebrew-tap`
-
-### Secrets required
-
-| Secret | Purpose |
-|--------|---------|
-| `GITHUB_TOKEN` | Auto-provided by Actions, used for the GitHub Release |
-| `HOMEBREW_TAP_GITHUB_TOKEN` | PAT with write access to `gboston/homebrew-tap` |
-
 ## License
 
-AGPL-3.0
+[AGPL-3.0](LICENSE)

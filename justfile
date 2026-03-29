@@ -15,6 +15,9 @@ test:
 clean:
     rm -f {{binary}}
 
+demo:
+    bash scripts/record-demo.sh
+
 deploy-relay:
     docker build --platform linux/amd64 -t europe-west1-docker.pkg.dev/keytun-website/keytun/relay:latest .
     docker push europe-west1-docker.pkg.dev/keytun-website/keytun/relay:latest
