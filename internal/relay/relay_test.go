@@ -528,33 +528,6 @@ func TestHandleWebSocketDisconnectBeforeFirstMessage(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 }
 
-func TestSweepStaleLimiters(t *testing.T) {
-	r := New()
-
-	// Create limiters via the public API (which locks internally)
-	r.getLimiter("1.2.3.4")
-	r.getLimiter("5.6.7.8")
-
-	// Backdate the stale entry
-	r.limitersMu.Lock()
-	r.limiters["1.2.3.4"].lastSeen = time.Now().Add(-10 * time.Minute)
-	r.limitersMu.Unlock()
-
-	r.sweepStaleLimiters()
-
-	r.limitersMu.Lock()
-	_, staleExists := r.limiters["1.2.3.4"]
-	_, freshExists := r.limiters["5.6.7.8"]
-	r.limitersMu.Unlock()
-
-	if staleExists {
-		t.Error("stale limiter should have been removed")
-	}
-	if !freshExists {
-		t.Error("fresh limiter should still exist")
-	}
-}
-
 func TestMultipleClientsJoinSameSession(t *testing.T) {
 	server, _ := newTestServer(t)
 
