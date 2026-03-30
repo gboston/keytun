@@ -67,7 +67,7 @@ func printSessionBox(code string) {
 }
 
 func formatDuration(d time.Duration) string {
-	d = d.Round(time.Second)
+	d = d.Truncate(time.Second)
 	h := int(d.Hours())
 	m := int(d.Minutes()) % 60
 	s := int(d.Seconds()) % 60
